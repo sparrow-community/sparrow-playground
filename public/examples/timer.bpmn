@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             id="Definitions_timer"
+             targetNamespace="http://sparrow.example/timer">
+  <process id="Process_timer" name="M2 Timer Catch" isExecutable="true">
+    <startEvent id="StartEvent_1">
+      <outgoing>Flow_start_to_timer</outgoing>
+    </startEvent>
+    <intermediateCatchEvent id="TimerCatch_1" name="Wait">
+      <incoming>Flow_start_to_timer</incoming>
+      <outgoing>Flow_timer_to_end</outgoing>
+      <timerEventDefinition id="TimerDef_1">
+        <timeDuration xsi:type="tFormalExpression">PT0S</timeDuration>
+      </timerEventDefinition>
+    </intermediateCatchEvent>
+    <endEvent id="EndEvent_1">
+      <incoming>Flow_timer_to_end</incoming>
+    </endEvent>
+    <sequenceFlow id="Flow_start_to_timer" sourceRef="StartEvent_1" targetRef="TimerCatch_1"/>
+    <sequenceFlow id="Flow_timer_to_end" sourceRef="TimerCatch_1" targetRef="EndEvent_1"/>
+  </process>
+</definitions>

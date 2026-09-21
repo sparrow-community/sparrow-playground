@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Prefer gzip in public/; keep uncompressed out of git
+public/vendor/sparrow/*.wasm
+!public/vendor/sparrow/*.wasm.gz

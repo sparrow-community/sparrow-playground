@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             id="Definitions_m1"
+             targetNamespace="http://sparrow.example/m1">
+  <process id="Process_m1" name="M1 Simple" isExecutable="true">
+    <startEvent id="StartEvent_1" name="Start">
+      <outgoing>Flow_start_to_task</outgoing>
+    </startEvent>
+    <userTask id="UserTask_1" name="Review">
+      <incoming>Flow_start_to_task</incoming>
+      <outgoing>Flow_task_to_gw</outgoing>
+    </userTask>
+    <exclusiveGateway id="Gateway_1" name="Decision" default="Flow_gw_to_end_ok">
+      <incoming>Flow_task_to_gw</incoming>
+      <outgoing>Flow_gw_to_end_ok</outgoing>
+      <outgoing>Flow_gw_to_end_other</outgoing>
+    </exclusiveGateway>
+    <endEvent id="EndEvent_ok" name="Done">
+      <incoming>Flow_gw_to_end_ok</incoming>
+    </endEvent>
+    <endEvent id="EndEvent_other" name="Other">
+      <incoming>Flow_gw_to_end_other</incoming>
+    </endEvent>
+    <sequenceFlow id="Flow_start_to_task" sourceRef="StartEvent_1" targetRef="UserTask_1"/>
+    <sequenceFlow id="Flow_task_to_gw" sourceRef="UserTask_1" targetRef="Gateway_1"/>
+    <sequenceFlow id="Flow_gw_to_end_ok" sourceRef="Gateway_1" targetRef="EndEvent_ok"/>
+    <sequenceFlow id="Flow_gw_to_end_other" sourceRef="Gateway_1" targetRef="EndEvent_other">
+      <conditionExpression xsi:type="tFormalExpression">${approved == false}</conditionExpression>
+    </sequenceFlow>
+  </process>
+</definitions>

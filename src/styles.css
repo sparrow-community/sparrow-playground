@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/* shadcn-like design tokens (light) — no React/shadcn runtime */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(240 10% 3.9%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(240 10% 3.9%);
+  --color-muted: hsl(240 4.8% 95.9%);
+  --color-muted-foreground: hsl(240 3.8% 46.1%);
+  --color-border: hsl(240 5.9% 90%);
+  --color-input: hsl(240 5.9% 90%);
+  --color-primary: hsl(240 5.9% 10%);
+  --color-primary-foreground: hsl(0 0% 98%);
+  --color-secondary: hsl(240 4.8% 95.9%);
+  --color-secondary-foreground: hsl(240 5.9% 10%);
+  --color-accent: hsl(240 4.8% 95.9%);
+  --color-accent-foreground: hsl(240 5.9% 10%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-ring: hsl(240 5.9% 10%);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
+
+@layer components {
+  .ui-btn-outline {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-xs transition-colors;
+    @apply hover:bg-accent hover:text-accent-foreground;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+  .ui-btn-primary {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground shadow-xs transition-colors;
+    @apply hover:bg-primary/90;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+#canvas .djs-container {
+  background: var(--color-background) !important;
+}
+
+/*
+ * Shapes: stroke the primary visual.
+ * Connections: bpmn-js hides .djs-outline on selected flows (only bendpoints show),
+ * so we must recolor the path itself for a full-line highlight.
+ */
+/* Direct child only — a marker on bpmn:Process must not thicken every descendant. */
+.highlight-waiting:not(.djs-connection) > .djs-visual > :nth-child(1) {
+  stroke: var(--color-amber-500) !important;
+  stroke-width: 3px !important;
+}
+
+.highlight-flash:not(.djs-connection) > .djs-visual > :nth-child(1),
+.highlight-playback:not(.djs-connection) > .djs-visual > :nth-child(1) {
+  stroke: var(--color-primary) !important;
+  stroke-width: 3px !important;
+}
+
+.djs-connection.highlight-waiting .djs-visual path {
+  stroke: var(--color-amber-500) !important;
+  stroke-width: 3px !important;
+}
+
+.djs-connection.highlight-flash .djs-visual path,
+.djs-connection.highlight-playback .djs-visual path,
+.djs-connection.selected .djs-visual path {
+  stroke: var(--color-primary) !important;
+  stroke-width: 3px !important;
+}
+
+.djs-connection.highlight-flash .djs-outline,
+.djs-connection.highlight-playback .djs-outline {
+  display: block !important;
+  visibility: visible !important;
+  stroke: var(--color-primary) !important;
+  stroke-width: 6px !important;
+  stroke-opacity: 0.35;
+  fill: none !important;
+}
+
+.workspace.side-collapsed {
+  grid-template-columns: 1fr 2.5rem;
+}
+
+.workspace.side-collapsed .side-body,
+.workspace.side-collapsed #instance-select {
+  display: none;
+}
+
+.workspace.side-collapsed .side-head {
+  writing-mode: vertical-rl;
+  justify-content: flex-start;
+  height: 100%;
+  border-bottom: none;
+  padding: 0.75rem 0.2rem;
+}
+
+.workspace.side-collapsed #btn-toggle-side::before {
+  content: "▸ ";
+}
+
+#btn-toggle-side::before {
+  content: "▾ ";
+  color: var(--color-muted-foreground);
+}
+
+@media (max-width: 800px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 40vh;
+  }
+  .workspace.side-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 2.5rem;
+  }
+  #side {
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+  }
+}

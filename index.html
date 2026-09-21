@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sparrow Playground</title>
+  </head>
+  <body class="m-0 h-full bg-background font-sans text-foreground antialiased">
+    <div id="app" class="flex h-full min-h-0 flex-col">
+      <header
+        class="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3"
+      >
+        <div class="flex min-w-[8rem] items-baseline gap-2">
+          <span class="text-sm font-semibold tracking-tight">Sparrow</span>
+          <span class="text-xs text-muted-foreground">Playground</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <label
+            class="inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            Open
+            <input
+              id="file-open"
+              type="file"
+              accept=".bpmn,.xml,application/xml,text/xml"
+              class="hidden"
+            />
+          </label>
+          <button type="button" id="btn-download" class="ui-btn-outline">Download</button>
+          <button type="button" id="btn-example" class="ui-btn-outline">Example</button>
+          <button type="button" id="btn-run" class="ui-btn-primary" disabled>Run</button>
+        </div>
+        <div class="ml-auto">
+          <span id="engine-status" class="text-xs text-muted-foreground">Loading engine…</span>
+        </div>
+      </header>
+
+      <div class="workspace grid min-h-0 flex-1 grid-cols-[1fr_22rem]">
+        <div id="canvas" class="min-h-0 min-w-0 bg-background" tabindex="0"></div>
+
+        <aside
+          id="side"
+          class="flex min-h-0 min-w-0 flex-col border-l border-border bg-muted/40"
+          data-collapsed="false"
+        >
+          <div class="side-head flex items-center gap-2 border-b border-border bg-background px-2 py-2">
+            <button
+              type="button"
+              id="btn-toggle-side"
+              class="px-1.5 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground"
+              aria-expanded="true"
+              title="Collapse panel"
+            >
+              Events
+            </button>
+            <select
+              id="instance-select"
+              class="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1 font-mono text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="Process instance"
+            ></select>
+          </div>
+          <div class="side-body flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-3">
+            <section id="waits-section">
+              <h2 class="mb-2 text-[0.7rem] font-medium tracking-wider text-muted-foreground uppercase">
+                Waiting
+              </h2>
+              <div id="waits" class="flex flex-col gap-2 text-sm text-muted-foreground">
+                No active waits
+              </div>
+            </section>
+            <section class="flex min-h-0 flex-1 flex-col">
+              <div class="mb-2 flex items-center justify-between gap-2">
+                <h2 class="text-[0.7rem] font-medium tracking-wider text-muted-foreground uppercase">
+                  Trail
+                </h2>
+                <div
+                  class="inline-flex h-7 items-center gap-0.5 rounded-lg bg-muted p-0.5"
+                  id="trail-filter"
+                  role="group"
+                  aria-label="Trail filter"
+                >
+                  <button
+                    type="button"
+                    data-filter="all"
+                    class="trail-filter-btn inline-flex h-6 items-center justify-center rounded-md bg-background px-2 text-[0.7rem] font-medium text-foreground shadow-xs"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    data-filter="event"
+                    class="trail-filter-btn inline-flex h-6 items-center justify-center rounded-md px-2 text-[0.7rem] font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Events
+                  </button>
+                  <button
+                    type="button"
+                    data-filter="command"
+                    class="trail-filter-btn inline-flex h-6 items-center justify-center rounded-md px-2 text-[0.7rem] font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Commands
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-card p-1.5 shadow-xs"
+                id="playback-bar"
+              >
+                <button type="button" id="play-restart" class="ui-btn-outline h-7 px-2" title="Restart">
+                  ⏮
+                </button>
+                <button type="button" id="play-prev" class="ui-btn-outline h-7 px-2" title="Previous EVENT">
+                  ◀
+                </button>
+                <button type="button" id="play-toggle" class="ui-btn-primary h-7 px-2.5" title="Play / Pause EVENTs">
+                  ▶
+                </button>
+                <button type="button" id="play-next" class="ui-btn-outline h-7 px-2" title="Next EVENT">
+                  ⏭
+                </button>
+                <label class="ml-1 flex items-center gap-1 text-[0.7rem] text-muted-foreground">
+                  Interval
+                  <select
+                    id="play-interval"
+                    class="h-7 rounded-md border border-input bg-background px-1.5 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    title="Frame interval"
+                  >
+                    <option value="200">200ms</option>
+                    <option value="500" selected>500ms</option>
+                    <option value="1000">1s</option>
+                    <option value="2000">2s</option>
+                  </select>
+                </label>
+                <span id="play-pos" class="ml-auto font-mono text-[0.7rem] text-muted-foreground">0 / 0</span>
+              </div>
+
+              <div
+                id="events"
+                class="flex min-h-0 flex-1 flex-col gap-2 overflow-auto text-sm text-muted-foreground"
+              >
+                Run a process to see the COMMAND → EVENT trail.
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+
+      <div
+        id="drop-overlay"
+        class="pointer-events-none fixed inset-0 z-20 grid place-items-center bg-foreground/40 text-xl font-semibold text-background"
+        hidden
+      >
+        <p>Drop BPMN to open</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
