@@ -1,0 +1,15 @@
+Sparrow Playground
+Copyright 2026 The Sparrow community and contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file.
+
+Third-party software
+--------------------
+
+public/vendor/sparrow/wasm_exec.js
+  Copyright 2018 The Go Authors. All rights reserved.
+  Source: Go 1.26.5 lib/wasm/wasm_exec.js (unmodified)
+  License: BSD-style license in public/vendor/sparrow/wasm_exec.LICENSE
+  This file is not covered by the Apache License 2.0 header used elsewhere
+  in this repository.
