@@ -2,6 +2,15 @@
   "name": "sparrow-playground",
   "private": true,
   "version": "0.1.0",
+  "description": "Browser BPMN modeler and run surface for the Sparrow WASM engine.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sparrow-community/sparrow-playground.git"
+  },
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || >=22.0.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
