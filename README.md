@@ -2,9 +2,9 @@
 
 Static web demo for the Sparrow BPMN engine: a [bpmn-js](https://github.com/bpmn-io/bpmn-js) modeler plus the engine compiled to WebAssembly. Open a diagram, deploy it, and run an instance in the browser.
 
-The engine is a separate project, intended to be published at [github.com/sparrow-community/sparrow](https://github.com/sparrow-community/sparrow). That GitHub repository is **not published yet**. You do not need it to run this demo. The WebAssembly module is already vendored in `public/vendor/sparrow/`.
+The engine lives at [github.com/sparrow-community/sparrow](https://github.com/sparrow-community/sparrow). You do not need a local engine checkout to run this demo. The WebAssembly module is already vendored in `public/vendor/sparrow/`.
 
-This repository is the playground itself. The intended public GitHub location is [github.com/sparrow-community/sparrow-playground](https://github.com/sparrow-community/sparrow-playground) (also not published yet).
+This repository is the playground: [github.com/sparrow-community/sparrow-playground](https://github.com/sparrow-community/sparrow-playground). How to contribute: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Requirements
 
@@ -33,7 +33,7 @@ npm run build      # static files in dist/
 npm run preview    # serve dist/ locally
 ```
 
-`dist/` is what you host. Open it over HTTP. `file://` will not load the module. GitHub Pages is not enabled in this repo yet. `public/.nojekyll` is copied into `dist/` so a later Pages publish of `dist/` will not be processed by Jekyll.
+`dist/` is what you host. Open it over HTTP. `file://` will not load the module. GitHub Pages is optional and not required to develop locally. `public/.nojekyll` is copied into `dist/` so a Pages publish of `dist/` will not be processed by Jekyll.
 
 ## Vendored engine
 
