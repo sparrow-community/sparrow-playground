@@ -18,7 +18,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["18", "20", "22"]
+        # Node 18: Tailwind oxide native binding often fails under `npm ci`
+        # (npm optional-deps bug). Engines still allow 18 for Vite's range;
+        # CI proves the supported LTS builds.
+        node-version: ["20", "22"]
     steps:
       - uses: actions/checkout@v4
 

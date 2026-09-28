@@ -8,7 +8,7 @@ This repository is the playground: [github.com/sparrow-community/sparrow-playgro
 
 ## Requirements
 
-Node.js **18**, **20**, or **22 or newer**. [Vite 6](https://vite.dev/) accepts `^18.0.0 || ^20.0.0 || >=22.0.0`. Odd releases such as Node 19 and 21 are outside that range. `bpmn-auto-layout` needs Node 18 or newer.
+Node.js **20** or **22 or newer** for a reliable build. [Vite 6](https://vite.dev/) also accepts Node 18, but Tailwind’s native binding often fails under `npm ci` on Node 18, so CI covers 20 and 22 only. Odd releases such as Node 19 and 21 are outside Vite’s range.
 
 Use a current browser. The page inflates `sparrow.wasm.gz` with `DecompressionStream`.
 

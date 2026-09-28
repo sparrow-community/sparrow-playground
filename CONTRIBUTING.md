@@ -14,7 +14,7 @@ Maintainers develop in Cursor with `origin` as the working remote, then mirror a
 
 ## Local development
 
-Node.js **18**, **20**, or **22+** (see `package.json` `engines`).
+Node.js **20** or **22+** for CI-parity builds (see `package.json` `engines`).
 
 ```bash
 npm install
@@ -26,7 +26,7 @@ npm run build
 npm run preview
 ```
 
-CI runs `npm ci` and `npm run build`.
+CI runs `npm ci` and `npm run build` on Node 20 and 22.
 
 ## Refreshing the vendored WASM (optional)
 
