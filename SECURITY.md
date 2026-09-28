@@ -10,12 +10,12 @@ Prefer [private vulnerability reporting](https://docs.github.com/en/code-securit
 
 ## Browser demo surface
 
-This project loads a vendored WebAssembly build of the Sparrow kernel and exposes the same command surface inside the page. There is no network listener of its own; whoever can run scripts in the page can call that surface.
+This project loads `@sparrow-community/wasm` and exposes the same command surface inside the page. There is no network listener of its own; whoever can run scripts in the page can call that surface.
 
 - Treat diagrams you open or paste as untrusted input until you trust the author.
 - Deployed BPMN can include expressions the engine evaluates; see the kernel [`SECURITY.md`](https://github.com/sparrow-community/sparrow/blob/main/SECURITY.md).
 - Hosting `dist/` on the public internet publishes a demo, not a multi-tenant production control plane.
 
-## Vendored engine
+## Engine package lag
 
-`public/vendor/sparrow/` may lag the kernel `main` branch. Security fixes that land in the engine need a rebuild and `npm run sync-wasm` before this demo picks them up.
+`package.json` pins a specific `@sparrow-community/wasm` version. Security fixes that land in the engine need a new npm publish and a dependency bump here before this demo (and Pages) pick them up.

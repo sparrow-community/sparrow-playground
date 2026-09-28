@@ -1,16 +1,14 @@
 /**
  * Browser WASM host: load gzip module, timers, JS jobs.
  * Engine methods return `{ $error }` instead of panicking so Go stays alive.
+ * Artifacts come from `@sparrow-community/wasm` (resolved by Vite).
  */
-const VENDOR = "vendor/sparrow/";
+import wasmExecUrl from "@sparrow-community/wasm/wasm_exec.js?url";
+import wasmGzUrl from "@sparrow-community/wasm/sparrow.wasm.gz?url";
 
 let ready = null;
 let timerHandle = null;
 let wasmBytesCache = null;
-
-function vendorURL(name) {
-  return new URL(VENDOR + name, document.baseURI || location.href);
-}
 
 async function inflateGzip(buffer) {
   if (typeof DecompressionStream === "undefined") {
@@ -50,7 +48,7 @@ async function loadWasmArrayBuffer(res) {
   if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b) {
     return inflateGzip(buf);
   }
-  throw new Error("vendor sparrow.wasm.gz is neither WASM nor gzip");
+  throw new Error("sparrow.wasm.gz is neither WASM nor gzip");
 }
 
 function unwrapResult(out) {
@@ -93,13 +91,12 @@ function wrapEngine(raw) {
 
 async function instantiateEngine() {
   if (typeof globalThis.Go !== "function") {
-    await loadScript(vendorURL("wasm_exec.js").href);
+    await loadScript(wasmExecUrl);
   }
   if (!wasmBytesCache) {
-    const gzURL = vendorURL("sparrow.wasm.gz").href;
-    const gz = await fetch(gzURL);
+    const gz = await fetch(wasmGzUrl);
     if (!gz.ok) {
-      throw new Error(`missing ${gzURL} (${gz.status}) — run npm run sync-wasm`);
+      throw new Error(`missing ${wasmGzUrl} (${gz.status}) — check @sparrow-community/wasm install`);
     }
     wasmBytesCache = await loadWasmArrayBuffer(gz);
   }

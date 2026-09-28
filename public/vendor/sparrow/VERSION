@@ -1,8 +1,0 @@
-engine: github.com/sparrow-community/sparrow
-module: github.com/sparrow-community/sparrow/wasm
-go: go1.26.5
-revision: c271f5ba155e69542a78a9c7a721121807ce8c8a
-revision_time: 2026-09-21T02:02:30Z
-vcs_modified: true
-wasm_gz_sha256: 182fbd21a0e7bb188f27f881f3b9fc2884f62d732b65e6d9ff84a61982df0747
-note: Written by scripts/sync-wasm.sh. revision, revision_time, vcs_modified, and go are read from Go build info embedded in sparrow.wasm.gz. vcs_modified=true means the engine worktree was dirty when the binary was built; that diff is not stored in the WASM. kernel_head is recorded only when sync-wasm copies from a git checkout.
