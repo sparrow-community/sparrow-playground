@@ -9,6 +9,7 @@ This repository is a **consumer** of the Sparrow kernel: browser modeler, overla
 | Public source of truth for readers | [github.com/sparrow-community/sparrow-playground](https://github.com/sparrow-community/sparrow-playground) |
 | Primary maintainer workspace | Cursor Origin remotes under the `slowrookie` account (this checkout’s `origin`) |
 | Engine | [github.com/sparrow-community/sparrow](https://github.com/sparrow-community/sparrow) |
+| Engine WASM on npm | [`@sparrow-community/wasm`](https://www.npmjs.com/package/@sparrow-community/wasm) |
 
 Maintainers develop in Cursor with `origin` as the working remote, then mirror accepted `main` to the `github` remote (`sparrow-community/sparrow-playground`).
 
@@ -26,28 +27,28 @@ npm run build
 npm run preview
 ```
 
-CI runs `npm ci` and `npm run build` on Node 20 and 22.
+CI runs `npm ci` and `npm run build` on Node 20 and 22. Pages deploy builds with `BASE_PATH=/sparrow-playground/`.
 
-## Refreshing the vendored WASM (optional)
+## Upgrading the engine WASM
 
-Skip unless you are changing the engine. Day-to-day demos use `public/vendor/sparrow/`.
+Bump `@sparrow-community/wasm` in `package.json` (prefer the current `latest` / `alpha` calver), then:
 
 ```bash
-# build the engine first: (cd /path/to/sparrow/wasm && ./build.sh)
-SPARROW_KERNEL=/path/to/sparrow npm run sync-wasm
+npm install
+npm run build
 ```
 
-`SPARROW_KERNEL` defaults to `../sparrow`.
+Commit `package.json` and `package-lock.json`. Do not vendor kernel artifacts under `public/`.
 
 ## Pull requests
 
-1. Keep PRs focused (UI/demo, sync scripts, or docs—not engine semantics).
+1. Keep PRs focused (UI/demo, dependency bumps, or docs—not engine semantics).
 2. Engine behavior changes belong in [sparrow](https://github.com/sparrow-community/sparrow).
-3. After rebuilding the engine, run `sync-wasm` and commit the updated vendor files with a clear note of the engine revision.
+3. After a new `@sparrow-community/wasm` publish, bump the dependency here so the demo and Pages site pick it up.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [Apache License 2.0](./LICENSE). See [`NOTICE`](./NOTICE) for `wasm_exec.js` (BSD).
+By contributing, you agree that your contributions are licensed under the [Apache License 2.0](./LICENSE). See [`NOTICE`](./NOTICE) for third-party attribution (`wasm_exec.js` via the npm package).
 
 ## Conduct
 

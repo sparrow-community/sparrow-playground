@@ -24,9 +24,9 @@ Browser **modeler + run** surface for the Sparrow BPMN execution and fact kernel
 | Concern | Where |
 |---------|--------|
 | Semantics / handlers | `../sparrow/processing` |
-| JS API contract | `../sparrow/wasm/sparrow.d.ts` (+ `public/vendor/sparrow/` after sync) |
-| WASM build | `../sparrow/wasm/build.sh` then `npm run sync-wasm` |
+| JS API / WASM artifacts | npm `@sparrow-community/wasm` (types: `sparrow.d.ts`) |
+| Kernel WASM build (publish) | `../sparrow/wasm/build.sh` → npm Trusted Publishing |
 
 ## Stack
 
-Vite + Tailwind (shadcn-like tokens/primitives, no React) + bpmn-js + `bpmn-auto-layout`. Light chrome. Static `dist/` for hosting. No backend.
+Vite + Tailwind (shadcn-like tokens/primitives, no React) + bpmn-js + `bpmn-auto-layout`. Light chrome. Static `dist/` for hosting. No backend. GitHub Pages base path: `/sparrow-playground/`.

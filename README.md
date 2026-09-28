@@ -2,9 +2,11 @@
 
 Static web demo for the Sparrow BPMN engine: a [bpmn-js](https://github.com/bpmn-io/bpmn-js) modeler plus the engine compiled to WebAssembly. Open a diagram, deploy it, and run an instance in the browser.
 
-The engine lives at [github.com/sparrow-community/sparrow](https://github.com/sparrow-community/sparrow). You do not need a local engine checkout to run this demo. The WebAssembly module is already vendored in `public/vendor/sparrow/`.
+The engine lives at [github.com/sparrow-community/sparrow](https://github.com/sparrow-community/sparrow). This demo depends on the published npm package [`@sparrow-community/wasm`](https://www.npmjs.com/package/@sparrow-community/wasm) (no local kernel checkout or vendored copy required).
 
-This repository is the playground: [github.com/sparrow-community/sparrow-playground](https://github.com/sparrow-community/sparrow-playground). How to contribute: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Live site (GitHub Pages): [https://sparrow-community.github.io/sparrow-playground/](https://sparrow-community.github.io/sparrow-playground/)
+
+This repository: [github.com/sparrow-community/sparrow-playground](https://github.com/sparrow-community/sparrow-playground). How to contribute: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Requirements
 
@@ -19,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Vite prints a local URL (default [http://127.0.0.1:5173/](http://127.0.0.1:5173/)).
+Vite prints a local URL (default [http://127.0.0.1:5173/](http://127.0.0.1:5173/)). Dev uses `BASE_PATH=/`.
 
 - **Open**, **Download**, or drag a `.bpmn` file onto the page. Diagrams without DI are laid out with `bpmn-auto-layout` before import.
 - **Example** loads `public/examples/user-task.bpmn`.
@@ -29,48 +31,27 @@ Vite prints a local URL (default [http://127.0.0.1:5173/](http://127.0.0.1:5173/
 ## Build
 
 ```bash
-npm run build      # static files in dist/
-npm run preview    # serve dist/ locally
+npm run build      # static files in dist/ (default base /sparrow-playground/)
+npm run preview    # serve dist/ locally at that base path
 ```
 
-`dist/` is what you host. Open it over HTTP. `file://` will not load the module. GitHub Pages is optional and not required to develop locally. `public/.nojekyll` is copied into `dist/` so a Pages publish of `dist/` will not be processed by Jekyll.
+`dist/` is what you host. Open it over HTTP. `file://` will not load the module. For a root-hosted preview, set `BASE_PATH=/` when building.
 
-## Vendored engine
+GitHub Pages deploys `dist/` from `main` via [`.github/workflows/pages.yml`](./.github/workflows/pages.yml). `public/.nojekyll` is copied into `dist/` so Pages does not process the site with Jekyll.
 
-`public/vendor/sparrow/VERSION` records the engine build baked into `sparrow.wasm.gz`.
+## Engine package
 
 | | |
 |---|---|
-| Module | `github.com/sparrow-community/sparrow/wasm` |
-| Revision | `c271f5ba155e69542a78a9c7a721121807ce8c8a` |
-| Revision time | 2026-09-21T02:02:30Z |
-| Dirty worktree | yes (`vcs.modified=true`) |
-| Go | go1.26.5 |
+| npm | `@sparrow-community/wasm` |
+| Locked version | see `package.json` / `package-lock.json` (currently `2026.9.28-alpha.1`) |
+| Dist-tags | `latest` and `alpha` both track calver `YYYY.M.D-alpha.N` |
+| Upgrade | bump the dependency, run `npm install`, commit lockfile |
 
-The revision comes from Go build info inside the binary. `vcs.modified=true` means the engine checkout had uncommitted changes when this WASM was built. That diff is not stored in the binary, so the artifact is that commit plus an unknown local delta. There is no sibling engine checkout in this repository to recover the delta.
-
-`wasm_exec.js` is an unmodified copy of Go 1.26.5 `lib/wasm/wasm_exec.js`.
-
-## Optional: refresh WASM from an engine checkout
-
-Skip this unless you are changing the engine. `npm install`, `npm run dev`, `npm run build`, and `npm run preview` all use the committed files under `public/vendor/sparrow/`.
-
-```bash
-# build the engine first, then point at its checkout
-#   (cd /path/to/sparrow/wasm && ./build.sh)
-SPARROW_KERNEL=/path/to/sparrow npm run sync-wasm
-```
-
-`SPARROW_KERNEL` defaults to `../sparrow`. `scripts/sync-wasm.sh` copies `sparrow.wasm.gz`, `wasm_exec.js`, and `sparrow.d.ts`, then rewrites `VERSION` from the binary's Go build info. When the kernel directory is a git checkout, it also records that checkout's `HEAD` and whether the worktree was dirty.
-
-To restamp `VERSION` from the WASM already in this repo, without copying:
-
-```bash
-npm run sync-wasm -- --stamp-only
-```
+`wasm_exec.js` ships inside that package (Go BSD license). Types: `@sparrow-community/wasm/sparrow.d.ts`.
 
 ## License
 
 Apache License 2.0. Copyright 2026 The Sparrow community and contributors. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-`public/vendor/sparrow/wasm_exec.js` is Go's WASM support script and is BSD-licensed. The license text is [public/vendor/sparrow/wasm_exec.LICENSE](public/vendor/sparrow/wasm_exec.LICENSE). The Apache license does not replace that BSD license.
+Go's `wasm_exec.js` (via `@sparrow-community/wasm`) remains BSD-licensed; the Apache license does not replace that BSD license.
