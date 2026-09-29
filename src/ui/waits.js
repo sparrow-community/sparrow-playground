@@ -1,6 +1,6 @@
 /**
  * MVP A wait panel: one card per wait with kind-specific COMMANDs.
- * Layer B/C can reuse renderWaitCard / action helpers later.
+ * MVP B inspector reuses renderWaitCard for element-scoped actions.
  */
 import {
   btnPrimary,
@@ -94,8 +94,13 @@ export function renderWaitCard(wait, ctx) {
     );
   }
   if (wait.instanceId && wait.source === "token" && wait.calledProcessInstanceId) {
-    const link = outlineBtn("Open child instance", () => {
-      onSelectInstance?.(wait.calledProcessInstanceId);
+    const childId = wait.calledProcessInstanceId;
+    const short =
+      childId.length > 12
+        ? childId.slice(0, 8) + "…" + childId.slice(-4)
+        : childId;
+    const link = outlineBtn(`Open child instance · ${short}`, () => {
+      onSelectInstance?.(childId);
     });
     card.appendChild(link);
   }
@@ -150,11 +155,16 @@ function appendActions(card, wait, { eng, onAction, onError }) {
       name.className = input;
       name.value = wait.messageName || "";
       name.placeholder = "message name";
+      const corr = varsField('{"orderId":"1"}');
+      corr.placeholder = '{"orderId":"1"}  correlation keys (optional)';
       const vars = varsField();
       card.appendChild(
         row(
           el("div", muted + " text-xs", "PublishMessage"),
           name,
+          el("div", muted + " text-xs", "correlationKeys (JSON, optional)"),
+          corr,
+          el("div", muted + " text-xs", "variables (JSON, optional)"),
           vars,
           primaryBtn("Publish message", () =>
             run(() => {
@@ -163,6 +173,7 @@ function appendActions(card, wait, { eng, onAction, onError }) {
               eng.publishMessage({
                 name: n,
                 instanceId,
+                correlationKeys: parseVarsJson(corr.value),
                 variables: parseVarsJson(vars.value),
               });
             }),
