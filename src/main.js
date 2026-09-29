@@ -7,10 +7,20 @@ import {
   setWaitingMarkers,
   seekElement,
 } from "./modeler.js";
-import { loadEngine, ensureEngine, armTimers, drainJobs, listWaits, looksLikeBpmn } from "./engine/host.js";
+import {
+  loadEngine,
+  ensureEngine,
+  armTimers,
+  drainJobs,
+  listWaits,
+  looksLikeBpmn,
+  setHostPolicy,
+  getHostPolicy,
+} from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
-import { btnPrimary, tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
+import { renderWaits } from "./ui/waits.js";
+import { tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -136,6 +146,12 @@ function syncPlaybackFrames() {
   playback.setFrames(frames);
 }
 
+function syncHostPolicyFromUI() {
+  const autoTimers = $("auto-timers")?.checked ?? true;
+  const autoJobs = $("auto-jobs")?.checked ?? true;
+  setHostPolicy({ autoTimers, autoJobs });
+}
+
 function refreshPanel() {
   const eng = globalThis.sparrow;
   renderInstanceSelect();
@@ -154,56 +170,18 @@ function refreshPanel() {
   }
 
   const waits = listWaits(currentInstanceId);
-  highlighted = waits.map((w) => w.elementId);
+  highlighted = renderWaits(waitsEl, waits, {
+    eng,
+    onAction: () => tickRuntime(),
+    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onSelectInstance: (id) => {
+      currentInstanceId = id;
+      playback.pause();
+      activeRecordId = "";
+      refreshPanel();
+    },
+  });
   setWaitingMarkers(modeler, highlighted);
-
-  if (!waits.length) {
-    waitsEl.textContent = "No active waits";
-    waitsEl.className = "flex flex-col gap-2 text-sm text-muted-foreground";
-  } else {
-    waitsEl.className = "flex flex-col gap-2";
-    waitsEl.innerHTML = "";
-    for (const w of waits) {
-      const card = document.createElement("div");
-      card.className =
-        "flex flex-col gap-2 rounded-lg border border-border bg-card p-3 text-sm shadow-xs";
-      const meta = document.createElement("div");
-      meta.className = "font-mono text-[0.7rem] text-muted-foreground";
-      meta.textContent = `${w.kind} · ${w.elementId}`;
-      card.appendChild(meta);
-      if (w.kind === "user" || w.kind === "wait") {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = btnPrimary;
-        btn.textContent = "Complete";
-        btn.addEventListener("click", () => {
-          try {
-            eng.complete({
-              instanceId: currentInstanceId,
-              elementId: w.elementId,
-              tokenId: w.id,
-              variables: { approved: true },
-            });
-            tickRuntime();
-          } catch (e) {
-            setStatus(String(e), "err");
-          }
-        });
-        card.appendChild(btn);
-      } else if (w.kind === "timer") {
-        const note = document.createElement("div");
-        note.className = "text-sm text-muted-foreground";
-        note.textContent = "Timer armed — JS host will FireDue";
-        card.appendChild(note);
-      } else if (w.kind === "job") {
-        const note = document.createElement("div");
-        note.className = "text-sm text-muted-foreground";
-        note.textContent = `Job ${w.jobType}`;
-        card.appendChild(note);
-      }
-      waitsEl.appendChild(card);
-    }
-  }
 
   try {
     const { events } = eng.listEvents(currentInstanceId);
@@ -300,6 +278,19 @@ function wireChrome() {
   $("play-interval")?.addEventListener("change", (ev) => {
     playback.setIntervalMs(ev.target.value);
   });
+
+  const onPolicyChange = () => {
+    syncHostPolicyFromUI();
+    const policy = getHostPolicy();
+    setStatus(
+      `Host: timers ${policy.autoTimers ? "auto" : "manual"} · jobs ${policy.autoJobs ? "auto" : "manual"}`,
+      "ok",
+    );
+    tickRuntime();
+  };
+  $("auto-timers")?.addEventListener("change", onPolicyChange);
+  $("auto-jobs")?.addEventListener("change", onPolicyChange);
+  syncHostPolicyFromUI();
 
   const overlay = $("drop-overlay");
   let dragDepth = 0;
