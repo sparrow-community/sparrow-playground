@@ -17,7 +17,8 @@ Browser **modeler + run** surface for the Sparrow BPMN execution and fact kernel
 - Full-bleed **bpmn-js** modeler on load (Open / Download / drag-drop).
 - Missing DI → `bpmn-auto-layout` before import.
 - **Run** deploys current XML and starts a new instance; Events + waits in a
-  collapsible side panel; waiting user tasks can be Completed from the panel.
+  collapsible side panel. Every wait kind has a manual affordance (MVP A);
+  Auto timers / Auto jobs toggles control JS host scheduling.
 
 ## Coordinate with the kernel
 
