@@ -1,6 +1,6 @@
 /**
  * MVP B — per-node inspector: tokens, intent, vars snippet, scoped wait COMMANDs.
- * Layer C (debugger) can reuse this panel for breakpoint / inspect chrome.
+ * MVP C adds breakpoint toggle on the selected element.
  */
 import {
   btnOutline,
@@ -10,6 +10,7 @@ import {
   sectionLabel,
 } from "./classes.js";
 import { renderWaitCard } from "./waits.js";
+import { hasBreakpoint, toggleBreakpoint } from "../engine/host.js";
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -112,6 +113,7 @@ export function elementContext(instanceId, elementId, waits) {
  *   onError: (err: unknown) => void,
  *   onSelectInstance?: (id: string) => void,
  *   onClear?: () => void,
+ *   onBreakpointChange?: () => void,
  * }} opts
  */
 export function renderInspector(container, opts) {
@@ -125,6 +127,7 @@ export function renderInspector(container, opts) {
     onError,
     onSelectInstance,
     onClear,
+    onBreakpointChange,
   } = opts;
 
   container.innerHTML = "";
@@ -164,14 +167,28 @@ export function renderInspector(container, opts) {
   title.appendChild(sub);
   head.appendChild(title);
 
+  const headActions = el("div", "flex shrink-0 items-center gap-1");
+  const bpOn = hasBreakpoint(elementId);
+  const bpBtn = document.createElement("button");
+  bpBtn.type = "button";
+  bpBtn.className = btnOutline + " h-7 px-2 text-xs";
+  bpBtn.textContent = bpOn ? "BP ✓" : "BP";
+  bpBtn.title = bpOn ? "Clear breakpoint" : "Set breakpoint";
+  bpBtn.addEventListener("click", () => {
+    toggleBreakpoint(elementId);
+    onBreakpointChange?.();
+  });
+  headActions.appendChild(bpBtn);
+
   if (onClear) {
     const clear = document.createElement("button");
     clear.type = "button";
-    clear.className = btnOutline + " h-7 shrink-0 px-2 text-xs";
+    clear.className = btnOutline + " h-7 px-2 text-xs";
     clear.textContent = "Clear";
     clear.addEventListener("click", onClear);
-    head.appendChild(clear);
+    headActions.appendChild(clear);
   }
+  head.appendChild(headActions);
   container.appendChild(head);
 
   if (!instanceId) {

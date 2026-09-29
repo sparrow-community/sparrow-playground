@@ -83,6 +83,28 @@ export function setInspectMarker(modeler, elementId) {
   canvas.addMarker(el.id, "highlight-inspect");
 }
 
+/** Breakpoint markers (MVP C). */
+export function setBreakpointMarkers(modeler, elementIds) {
+  clearMarkers(modeler, "highlight-breakpoint");
+  const canvas = modeler.get("canvas");
+  const registry = modeler.get("elementRegistry");
+  for (const id of elementIds || []) {
+    const el = registry.get(id);
+    if (el && !isDiagramRoot(el, canvas)) canvas.addMarker(el.id, "highlight-breakpoint");
+  }
+}
+
+/** Paused-at marker (MVP C) — distinct from waiting amber / inspect sky. */
+export function setPausedMarker(modeler, elementId) {
+  clearMarkers(modeler, "highlight-paused");
+  if (!elementId) return;
+  const canvas = modeler.get("canvas");
+  const registry = modeler.get("elementRegistry");
+  const el = registry.get(elementId);
+  if (!el || isDiagramRoot(el, canvas)) return;
+  canvas.addMarker(el.id, "highlight-paused");
+}
+
 /**
  * Subscribe to bpmn-js selection changes.
  * @returns {() => void} unsubscribe
