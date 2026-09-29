@@ -10,6 +10,26 @@ let ready = null;
 let timerHandle = null;
 let wasmBytesCache = null;
 
+/** Host scheduling policy (MVP A). Defaults preserve Example auto-advance. */
+const hostPolicy = {
+  autoTimers: true,
+  autoJobs: true,
+};
+
+export function getHostPolicy() {
+  return { ...hostPolicy };
+}
+
+export function setHostPolicy(partial = {}) {
+  if (typeof partial.autoTimers === "boolean") hostPolicy.autoTimers = partial.autoTimers;
+  if (typeof partial.autoJobs === "boolean") hostPolicy.autoJobs = partial.autoJobs;
+  if (!hostPolicy.autoTimers) {
+    clearTimeout(timerHandle);
+    timerHandle = null;
+  }
+  return getHostPolicy();
+}
+
 async function inflateGzip(buffer) {
   if (typeof DecompressionStream === "undefined") {
     throw new Error("DecompressionStream unsupported; use a modern browser");
@@ -144,6 +164,8 @@ export async function ensureEngine() {
 
 export function armTimers(onFire) {
   clearTimeout(timerHandle);
+  timerHandle = null;
+  if (!hostPolicy.autoTimers) return;
   const eng = globalThis.sparrow;
   if (!eng) return;
   let due;
@@ -167,7 +189,21 @@ export function armTimers(onFire) {
   }, delay);
 }
 
+/** Advance engine clock to due (or now) and FireDue once, then restore wall clock. */
+export function fireTimerNow(dueUnixMs) {
+  const eng = globalThis.sparrow;
+  if (!eng) throw new Error("engine not ready");
+  const target = dueUnixMs > 0 ? dueUnixMs : Date.now();
+  eng.setNowUnixMs(target);
+  try {
+    eng.fireDue();
+  } finally {
+    eng.setNowUnixMs(null);
+  }
+}
+
 export function drainJobs(onChange) {
+  if (!hostPolicy.autoJobs) return;
   const eng = globalThis.sparrow;
   if (!eng) return;
   const discovered = new Set(["javascript", "text/javascript"]);
@@ -185,77 +221,210 @@ export function drainJobs(onChange) {
     }
   }
   for (const jobType of discovered) {
-    let jobs;
-    try {
-      jobs = eng.activate({ jobType, maxJobs: 16, workerId: "playground" }).jobs || [];
-    } catch {
-      continue;
-    }
-    for (const job of jobs) {
-      try {
-        if (job.script && /javascript/i.test(job.scriptFormat || "javascript")) {
-          const fn = new Function("variables", job.script + "\n;return variables;");
-          const variables = fn({ ...(job.variables || {}) });
-          eng.complete({
-            instanceId: job.instanceId,
-            elementId: job.elementId,
-            tokenId: job.tokenId,
-            variables,
-          });
-        } else if (!job.script) {
-          eng.complete({
-            instanceId: job.instanceId,
-            elementId: job.elementId,
-            tokenId: job.tokenId,
-          });
-        } else {
-          eng.fail({
-            instanceId: job.instanceId,
-            elementId: job.elementId,
-            tokenId: job.tokenId,
-            message: "unsupported scriptFormat in playground",
-            noRetry: true,
-          });
-        }
-      } catch (e) {
-        try {
-          eng.fail({
-            instanceId: job.instanceId,
-            elementId: job.elementId,
-            tokenId: job.tokenId,
-            message: String(e),
-            noRetry: false,
-          });
-        } catch {
-          /* engine may be dead */
-        }
-      }
-      onChange?.();
-    }
+    runJobsOfType(eng, jobType, null, onChange);
   }
 }
 
-export function listWaits(instanceId) {
+/**
+ * Activate + Complete/Fail one job wait (or all of a type when tokenId is null).
+ * @param {"complete"|"fail"} action
+ */
+export function runJobForWait(wait, action = "complete", variables) {
+  const eng = globalThis.sparrow;
+  if (!eng) throw new Error("engine not ready");
+  const jobType = wait.jobType;
+  if (!jobType) throw new Error("wait has no jobType");
+  const jobs = eng.activate({
+    jobType,
+    maxJobs: 16,
+    workerId: "playground",
+  }).jobs || [];
+  const match = jobs.filter(
+    (j) =>
+      j.tokenId === wait.tokenId &&
+      j.instanceId === wait.instanceId &&
+      j.elementId === wait.elementId,
+  );
+  const targets = match.length ? match : jobs.filter((j) => j.tokenId === wait.tokenId);
+  if (!targets.length) {
+    throw new Error(`no activated job for ${jobType} / ${wait.tokenId}`);
+  }
+  for (const job of targets) {
+    if (action === "fail") {
+      eng.fail({
+        instanceId: job.instanceId,
+        elementId: job.elementId,
+        tokenId: job.tokenId,
+        message: "failed from playground wait panel",
+        noRetry: true,
+      });
+      continue;
+    }
+    completeActivatedJob(eng, job, variables);
+  }
+}
+
+function runJobsOfType(eng, jobType, tokenId, onChange) {
+  let jobs;
+  try {
+    jobs = eng.activate({ jobType, maxJobs: 16, workerId: "playground" }).jobs || [];
+  } catch {
+    return;
+  }
+  for (const job of jobs) {
+    if (tokenId && job.tokenId !== tokenId) continue;
+    try {
+      completeActivatedJob(eng, job);
+    } catch (e) {
+      try {
+        eng.fail({
+          instanceId: job.instanceId,
+          elementId: job.elementId,
+          tokenId: job.tokenId,
+          message: String(e),
+          noRetry: false,
+        });
+      } catch {
+        /* engine may be dead */
+      }
+    }
+    onChange?.();
+  }
+}
+
+function completeActivatedJob(eng, job, overrideVars) {
+  if (job.script && /javascript/i.test(job.scriptFormat || "javascript")) {
+    const fn = new Function("variables", job.script + "\n;return variables;");
+    const variables = overrideVars ?? fn({ ...(job.variables || {}) });
+    eng.complete({
+      instanceId: job.instanceId,
+      elementId: job.elementId,
+      tokenId: job.tokenId,
+      variables,
+    });
+    return;
+  }
+  if (!job.script) {
+    eng.complete({
+      instanceId: job.instanceId,
+      elementId: job.elementId,
+      tokenId: job.tokenId,
+      variables: overrideVars,
+    });
+    return;
+  }
+  eng.fail({
+    instanceId: job.instanceId,
+    elementId: job.elementId,
+    tokenId: job.tokenId,
+    message: "unsupported scriptFormat in playground",
+    noRetry: true,
+  });
+}
+
+/**
+ * Classify a waiting/blocked token into a wait-panel kind.
+ * Conditional: timerText (expression) with no due/message/signal/job.
+ */
+export function classifyTokenWait(tok) {
+  if (!tok) return "user";
+  if (tok.status === "blocked" || tok.incidentErrorMessage) return "incident";
+  if (tok.jobType) return "job";
+  if (tok.dueUnixMs > 0) return "timer";
+  if (tok.messageName) return "message";
+  if (tok.signalName) return "signal";
+  if (tok.timerText) return "conditional";
+  return "user";
+}
+
+function classifyBoundaryKind(bw) {
+  const k = String(bw?.kind || "").toLowerCase();
+  if (k === "timer" || k === "message" || k === "signal" || k === "conditional") return k;
+  if (bw?.dueUnixMs > 0) return "timer";
+  if (bw?.messageName) return "message";
+  if (bw?.signalName) return "signal";
+  return "conditional";
+}
+
+function pushBoundaryRows(out, instanceId, tok) {
+  for (const bw of tok.boundaryWaits || []) {
+    if (!bw) continue;
+    const kind = classifyBoundaryKind(bw);
+    out.push({
+      id: `${tok.id}:boundary:${bw.boundaryId || kind}`,
+      tokenId: tok.id,
+      elementId: bw.boundaryId || tok.elementId,
+      hostElementId: tok.elementId,
+      boundaryId: bw.boundaryId,
+      kind,
+      status: tok.status,
+      messageName: bw.messageName || "",
+      signalName: bw.signalName || "",
+      dueUnixMs: bw.dueUnixMs || 0,
+      timerText: bw.timerText || "",
+      instanceId,
+      source: "boundary",
+    });
+  }
+}
+
+function pushTokenRow(out, instanceId, tok) {
+  const kind = classifyTokenWait(tok);
+  out.push({
+    id: tok.id,
+    tokenId: tok.id,
+    elementId: tok.elementId,
+    kind,
+    status: tok.status,
+    jobType: tok.jobType || "",
+    messageName: tok.messageName || "",
+    signalName: tok.signalName || "",
+    dueUnixMs: tok.dueUnixMs || 0,
+    timerText: tok.timerText || "",
+    incidentErrorMessage: tok.incidentErrorMessage || "",
+    calledProcessInstanceId: tok.calledProcessInstanceId || "",
+    instanceId,
+    source: "token",
+  });
+}
+
+/**
+ * Enumerate waits for an instance (and optionally child Call Activity instances).
+ * Expands boundaryWaits into separate actionable rows.
+ */
+export function listWaits(instanceId, { includeChildren = true } = {}) {
   const eng = globalThis.sparrow;
   if (!eng || !instanceId) return [];
-  let inst;
-  try {
-    inst = eng.getInstance(instanceId);
-  } catch {
-    return [];
-  }
   const out = [];
-  for (const tok of Object.values(inst.tokens || {})) {
-    if (tok.status !== "waiting" && tok.status !== "blocked") continue;
-    if (tok.scopeHost || tok.multiInstanceHost) continue;
-    let kind = "wait";
-    if (tok.jobType) kind = "job";
-    else if (tok.dueUnixMs > 0) kind = "timer";
-    else if (tok.messageName) kind = "message";
-    else if (tok.signalName) kind = "signal";
-    else kind = "user";
-    out.push({ ...tok, kind });
+  const seenInst = new Set();
+
+  function visit(id) {
+    if (!id || seenInst.has(id)) return;
+    seenInst.add(id);
+    let inst;
+    try {
+      inst = eng.getInstance(id);
+    } catch {
+      return;
+    }
+    const childIds = [];
+    for (const tok of Object.values(inst.tokens || {})) {
+      if (!tok) continue;
+      if (tok.calledProcessInstanceId) childIds.push(tok.calledProcessInstanceId);
+      if (tok.status !== "waiting" && tok.status !== "blocked") continue;
+
+      pushBoundaryRows(out, id, tok);
+
+      // Scope / MI hosts are not themselves completable; boundaries already listed.
+      if (tok.scopeHost || tok.multiInstanceHost) continue;
+      pushTokenRow(out, id, tok);
+    }
+    if (includeChildren) {
+      for (const child of childIds) visit(child);
+    }
   }
+
+  visit(instanceId);
   return out;
 }
 
@@ -264,4 +433,15 @@ export function looksLikeBpmn(xml) {
   const s = String(xml || "").trim();
   if (!s) return false;
   return /<definitions[\s>]/i.test(s) && /<process[\s>]/i.test(s);
+}
+
+/** Parse a vars textarea: empty → undefined; JSON object; else error. */
+export function parseVarsJson(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return undefined;
+  const parsed = JSON.parse(raw);
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("variables must be a JSON object");
+  }
+  return parsed;
 }
