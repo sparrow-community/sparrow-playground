@@ -26,7 +26,7 @@ Vite prints a local URL (default [http://127.0.0.1:5173/](http://127.0.0.1:5173/
 - **Open**, **Download**, or drag a `.bpmn` file onto the page. Diagrams without DI are laid out with `bpmn-auto-layout` before import.
 - **Example** loads `public/examples/user-task.bpmn`.
 - **Run** deploys the current XML and starts a new instance.
-- The side panel **Inspect** section shows tokens, intent, variables, and scoped COMMANDs for the selected diagram node (click any shape). **Waiting** lists all active waits with kind-specific actions (Complete, Publish Message/Signal with optional correlation keys, Fire due now, Evaluate conditions, Resolve incident, job Complete/Fail). Call Activity waits and the inspector deep-link parent/child instances. Toggle **Auto timers** / **Auto jobs** to keep today’s auto-advance or drive waits manually. Timers and jobs are hosted in the page, not inside the WASM module.
+- The side panel **Debug** section sets run mode (Continuous / Step / Breakpoints), Pause · Continue · Step for JS host FireDue/Activate, and breakpoints on the selected node (also toggle **BP** in Inspect). **Inspect** shows tokens, intent, variables, and scoped COMMANDs for the selected diagram node. **Waiting** lists all active waits with kind-specific actions (Complete, Publish Message/Signal with optional correlation keys, Fire due now, Evaluate conditions, Resolve incident, job Complete/Fail). Call Activity waits and the inspector deep-link parent/child instances. Toggle **Auto timers** / **Auto jobs** to keep today’s auto-advance or drive waits manually. Timers and jobs are hosted in the page, not inside the WASM module. Trail playback remains a viewer (not live step control).
 
 ## Build
 

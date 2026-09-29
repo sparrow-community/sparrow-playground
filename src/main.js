@@ -6,6 +6,8 @@ import {
   exportXML,
   setWaitingMarkers,
   setInspectMarker,
+  setBreakpointMarkers,
+  setPausedMarker,
   seekElement,
   onSelectionChanged,
   selectElement,
@@ -19,11 +21,17 @@ import {
   looksLikeBpmn,
   setHostPolicy,
   getHostPolicy,
+  getDebugState,
+  evaluateAutoPause,
+  isPaused,
+  onDebugChange,
+  disarmTimers,
 } from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
 import { renderWaits } from "./ui/waits.js";
 import { renderInspector } from "./ui/inspector.js";
+import { renderDebugger } from "./ui/debugger.js";
 import { tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
 
 const $ = (id) => document.getElementById(id);
@@ -82,6 +90,7 @@ async function openXML(xml) {
   await importDiagram(modeler, xml, { autoLayoutIfMissing: true });
   selectedElement = null;
   paintInspector();
+  paintDebugger();
 }
 
 async function openFile(file) {
@@ -169,6 +178,19 @@ function selectInstance(id) {
   refreshPanel();
 }
 
+function paintDebugger() {
+  const el = $("debugger");
+  if (!el) return;
+  const dbg = getDebugState();
+  setBreakpointMarkers(modeler, dbg.breakpoints);
+  setPausedMarker(modeler, dbg.paused ? dbg.pauseElementId : "");
+  renderDebugger(el, {
+    selectedElementId: selectedElement?.id || "",
+    onChange: () => tickRuntime(),
+    onStatus: setStatus,
+  });
+}
+
 function paintInspector() {
   const inspectEl = $("inspector");
   if (!inspectEl) return;
@@ -186,6 +208,11 @@ function paintInspector() {
     onClear: () => {
       selectedElement = null;
       selectElement(modeler, "");
+      paintInspector();
+      paintDebugger();
+    },
+    onBreakpointChange: () => {
+      paintDebugger();
       paintInspector();
     },
   });
@@ -207,11 +234,15 @@ function refreshPanel() {
     setWaitingMarkers(modeler, []);
     highlighted = [];
     paintInspector();
+    paintDebugger();
     return;
   }
 
   const waits = listWaits(currentInstanceId);
   lastWaits = waits;
+  evaluateAutoPause(waits);
+  if (isPaused()) disarmTimers();
+
   highlighted = renderWaits(waitsEl, waits, {
     eng,
     onAction: () => tickRuntime(),
@@ -220,6 +251,7 @@ function refreshPanel() {
   });
   setWaitingMarkers(modeler, highlighted);
   paintInspector();
+  paintDebugger();
 
   try {
     const { events } = eng.listEvents(currentInstanceId);
@@ -234,13 +266,19 @@ function refreshPanel() {
   }
 }
 
+/**
+ * Host tick: refresh first (auto-pause on waits), then FireDue/Activate only if not paused.
+ */
 function tickRuntime() {
+  refreshPanel();
+  if (isPaused()) return;
   drainJobs(() => refreshPanel());
   armTimers(() => {
     drainJobs(() => refreshPanel());
     refreshPanel();
   });
-  refreshPanel();
+  // Second refresh after sync job drain so markers/trail catch up.
+  if (!isPaused()) refreshPanel();
 }
 
 async function runProcess() {
@@ -327,7 +365,7 @@ function wireChrome() {
   $("auto-jobs")?.addEventListener("change", onPolicyChange);
   syncHostPolicyFromUI();
 
-  // MVP B: canvas selection → inspector
+  // MVP B: canvas selection → inspector; MVP C: debugger uses selection for Break
   onSelectionChanged(modeler, (el) => {
     if (!el || el.type === "bpmn:Process" || el.type === "bpmn:Collaboration") {
       selectedElement = null;
@@ -335,6 +373,11 @@ function wireChrome() {
       selectedElement = { id: el.id, type: el.type || "" };
     }
     paintInspector();
+    paintDebugger();
+  });
+
+  onDebugChange(() => {
+    paintDebugger();
   });
 
   const overlay = $("drop-overlay");
@@ -362,6 +405,7 @@ function wireChrome() {
 async function boot() {
   wireChrome();
   await openEmpty(modeler);
+  paintDebugger();
   try {
     await loadEngine();
     $("btn-run").disabled = false;
