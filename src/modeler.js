@@ -72,6 +72,54 @@ export function setWaitingMarkers(modeler, elementIds) {
   }
 }
 
+/** Inspect highlight for the currently selected diagram node (MVP B). */
+export function setInspectMarker(modeler, elementId) {
+  clearMarkers(modeler, "highlight-inspect");
+  if (!elementId) return;
+  const canvas = modeler.get("canvas");
+  const registry = modeler.get("elementRegistry");
+  const el = registry.get(elementId);
+  if (!el || isDiagramRoot(el, canvas)) return;
+  canvas.addMarker(el.id, "highlight-inspect");
+}
+
+/**
+ * Subscribe to bpmn-js selection changes.
+ * @returns {() => void} unsubscribe
+ */
+export function onSelectionChanged(modeler, handler) {
+  const eventBus = modeler.get("eventBus");
+  const listener = (e) => {
+    const sel = e.newSelection || [];
+    const first = sel[0] || null;
+    handler(first);
+  };
+  eventBus.on("selection.changed", listener);
+  return () => eventBus.off("selection.changed", listener);
+}
+
+/** Select (and optionally scroll to) an element without playback markers. */
+export function selectElement(modeler, elementId) {
+  const canvas = modeler.get("canvas");
+  const registry = modeler.get("elementRegistry");
+  const selection = modeler.get("selection");
+  if (!elementId) {
+    selection.select();
+    return;
+  }
+  const el = registry.get(elementId);
+  if (!el || isDiagramRoot(el, canvas)) {
+    selection.select();
+    return;
+  }
+  selection.select(el);
+  try {
+    canvas.scrollToElement(el);
+  } catch {
+    /* connections may not scroll */
+  }
+}
+
 function isDiagramRoot(el, canvas) {
   if (!el) return false;
   if (el === canvas.getRootElement()) return true;
