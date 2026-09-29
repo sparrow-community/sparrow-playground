@@ -84,6 +84,17 @@ body,
   stroke-width: 3px !important;
 }
 
+.highlight-breakpoint:not(.djs-connection) > .djs-visual > :nth-child(1) {
+  stroke: var(--color-rose-600) !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: 4 3;
+}
+
+.highlight-paused:not(.djs-connection) > .djs-visual > :nth-child(1) {
+  stroke: var(--color-orange-600) !important;
+  stroke-width: 4px !important;
+}
+
 .djs-connection.highlight-waiting .djs-visual path {
   stroke: var(--color-amber-500) !important;
   stroke-width: 3px !important;
@@ -92,6 +103,17 @@ body,
 .djs-connection.highlight-inspect .djs-visual path {
   stroke: var(--color-sky-600) !important;
   stroke-width: 3px !important;
+}
+
+.djs-connection.highlight-breakpoint .djs-visual path {
+  stroke: var(--color-rose-600) !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: 4 3;
+}
+
+.djs-connection.highlight-paused .djs-visual path {
+  stroke: var(--color-orange-600) !important;
+  stroke-width: 4px !important;
 }
 
 .djs-connection.highlight-flash .djs-visual path,

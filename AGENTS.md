@@ -19,6 +19,8 @@ Browser **modeler + run** surface for the Sparrow BPMN execution and fact kernel
 - **Run** deploys current XML and starts a new instance; Events + waits in a
   collapsible side panel. Every wait kind has a manual affordance (MVP A);
   canvas click opens a per-node inspector with scoped COMMANDs (MVP B);
+  Debug section offers continuous / step / breakpoints run modes with
+  Pause · Continue · Step and canvas breakpoint markers (MVP C);
   Auto timers / Auto jobs toggles control JS host scheduling.
 
 ## Coordinate with the kernel
