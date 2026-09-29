@@ -5,7 +5,10 @@ import {
   openEmpty,
   exportXML,
   setWaitingMarkers,
+  setInspectMarker,
   seekElement,
+  onSelectionChanged,
+  selectElement,
 } from "./modeler.js";
 import {
   loadEngine,
@@ -20,6 +23,7 @@ import {
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
 import { renderWaits } from "./ui/waits.js";
+import { renderInspector } from "./ui/inspector.js";
 import { tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
 
 const $ = (id) => document.getElementById(id);
@@ -30,6 +34,9 @@ let highlighted = [];
 let trailFilter = "all";
 let trailRecords = [];
 let activeRecordId = "";
+/** @type {{ id: string, type: string } | null} */
+let selectedElement = null;
+let lastWaits = [];
 
 const playback = createPlayback({
   onFrame(frame) {
@@ -73,6 +80,8 @@ function downloadBlob(filename, text) {
 
 async function openXML(xml) {
   await importDiagram(modeler, xml, { autoLayoutIfMissing: true });
+  selectedElement = null;
+  paintInspector();
 }
 
 async function openFile(file) {
@@ -152,6 +161,36 @@ function syncHostPolicyFromUI() {
   setHostPolicy({ autoTimers, autoJobs });
 }
 
+function selectInstance(id) {
+  if (!id) return;
+  currentInstanceId = id;
+  playback.pause();
+  activeRecordId = "";
+  refreshPanel();
+}
+
+function paintInspector() {
+  const inspectEl = $("inspector");
+  if (!inspectEl) return;
+  const eng = globalThis.sparrow;
+  setInspectMarker(modeler, selectedElement?.id || "");
+  renderInspector(inspectEl, {
+    elementId: selectedElement?.id || "",
+    elementType: selectedElement?.type || "",
+    instanceId: currentInstanceId,
+    waits: lastWaits,
+    eng,
+    onAction: () => tickRuntime(),
+    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onSelectInstance: selectInstance,
+    onClear: () => {
+      selectedElement = null;
+      selectElement(modeler, "");
+      paintInspector();
+    },
+  });
+}
+
 function refreshPanel() {
   const eng = globalThis.sparrow;
   renderInstanceSelect();
@@ -162,26 +201,25 @@ function refreshPanel() {
     waitsEl.className = "flex flex-col gap-2 text-sm text-muted-foreground";
     trailRecords = [];
     activeRecordId = "";
+    lastWaits = [];
     syncPlaybackFrames();
     paintTrail();
     setWaitingMarkers(modeler, []);
     highlighted = [];
+    paintInspector();
     return;
   }
 
   const waits = listWaits(currentInstanceId);
+  lastWaits = waits;
   highlighted = renderWaits(waitsEl, waits, {
     eng,
     onAction: () => tickRuntime(),
     onError: (e) => setStatus(String(e?.message || e), "err"),
-    onSelectInstance: (id) => {
-      currentInstanceId = id;
-      playback.pause();
-      activeRecordId = "";
-      refreshPanel();
-    },
+    onSelectInstance: selectInstance,
   });
   setWaitingMarkers(modeler, highlighted);
+  paintInspector();
 
   try {
     const { events } = eng.listEvents(currentInstanceId);
@@ -256,10 +294,7 @@ function wireChrome() {
     ev.target.value = "";
   });
   $("instance-select").addEventListener("change", (ev) => {
-    currentInstanceId = ev.target.value;
-    playback.pause();
-    activeRecordId = "";
-    refreshPanel();
+    selectInstance(ev.target.value);
   });
   $("btn-toggle-side").addEventListener("click", () => {
     const ws = document.querySelector(".workspace");
@@ -291,6 +326,16 @@ function wireChrome() {
   $("auto-timers")?.addEventListener("change", onPolicyChange);
   $("auto-jobs")?.addEventListener("change", onPolicyChange);
   syncHostPolicyFromUI();
+
+  // MVP B: canvas selection → inspector
+  onSelectionChanged(modeler, (el) => {
+    if (!el || el.type === "bpmn:Process" || el.type === "bpmn:Collaboration") {
+      selectedElement = null;
+    } else {
+      selectedElement = { id: el.id, type: el.type || "" };
+    }
+    paintInspector();
+  });
 
   const overlay = $("drop-overlay");
   let dragDepth = 0;

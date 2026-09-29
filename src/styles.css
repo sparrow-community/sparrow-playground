@@ -79,8 +79,18 @@ body,
   stroke-width: 3px !important;
 }
 
+.highlight-inspect:not(.djs-connection) > .djs-visual > :nth-child(1) {
+  stroke: var(--color-sky-600) !important;
+  stroke-width: 3px !important;
+}
+
 .djs-connection.highlight-waiting .djs-visual path {
   stroke: var(--color-amber-500) !important;
+  stroke-width: 3px !important;
+}
+
+.djs-connection.highlight-inspect .djs-visual path {
+  stroke: var(--color-sky-600) !important;
   stroke-width: 3px !important;
 }
 
