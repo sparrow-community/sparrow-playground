@@ -524,11 +524,30 @@ export function listWaits(instanceId, { includeChildren = true } = {}) {
   return out;
 }
 
+/** Optional XML namespace prefix (`bpmn:`, `omg:`, …) before a local name. */
+const NS_TAG = String.raw`(?:\w+:)?`;
+
 /** True when diagram XML looks runnable enough to Deploy. */
 export function looksLikeBpmn(xml) {
+  return diagnoseBpmnXml(xml) === null;
+}
+
+/**
+ * Why XML is not Deploy-ready, or null when it looks fine.
+ * Accepts bare or namespaced tags (`<process>` / `<bpmn:process>`).
+ */
+export function diagnoseBpmnXml(xml) {
   const s = String(xml || "").trim();
-  if (!s) return false;
-  return /<definitions[\s>]/i.test(s) && /<process[\s>]/i.test(s);
+  if (!s) return "Diagram XML is empty.";
+  const hasDefs = new RegExp(`<${NS_TAG}definitions[\\s>]`, "i").test(s);
+  const hasProcess = new RegExp(`<${NS_TAG}process[\\s>]`, "i").test(s);
+  if (!hasDefs) {
+    return "Not a BPMN definitions document — expected a <definitions> (or <bpmn:definitions>) root.";
+  }
+  if (!hasProcess) {
+    return "No <process> in this file — collaboration/choreography-only or empty definitions cannot be run.";
+  }
+  return null;
 }
 
 /**
