@@ -30,7 +30,7 @@ function notify() {
   }
 }
 
-export function onDebugChange(fn) {
+export function onInterventionChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
@@ -85,21 +85,26 @@ export function getInterventionState(instanceId = "") {
   }
 }
 
-/** @deprecated Prefer getInterventionState; kept for main/inspector call sites. */
-export function getDebugState(instanceId = "") {
+/**
+ * UI-facing session snapshot: local mode prefs + kernel pause/pending/BP.
+ * @param {string} [instanceId]
+ */
+export function getInterventionUiState(instanceId = "") {
   const st = getInterventionState(instanceId);
   return {
     mode: prefs.mode,
-    runMode: prefs.mode === "off" ? "continuous" : prefs.mode,
     enabled: st.enabled,
     paused: st.paused,
     pauseReason: st.pauseReason,
     pauseElementId: st.pauseElementId,
     pauseTokenId: st.pauseTokenId,
     pending: st.pending,
-    breakpoints: prefs.mode === "off" ? [...prefs.breakpoints] : st.breakpoints.length
-      ? st.breakpoints
-      : [...prefs.breakpoints],
+    breakpoints:
+      prefs.mode === "off"
+        ? [...prefs.breakpoints]
+        : st.breakpoints.length
+          ? st.breakpoints
+          : [...prefs.breakpoints],
     policy: st.policy,
     focusInstanceId: st.focusInstanceId,
     lastReject: prefs.lastReject,
@@ -116,13 +121,13 @@ export function getInterventionMode() {
  */
 export function setInterventionMode(mode, opts = {}) {
   if (mode !== "off" && mode !== "breakpoints" && mode !== "step") {
-    return getDebugState(opts.instanceId);
+    return getInterventionUiState(opts.instanceId);
   }
   prefs.mode = mode;
   const instanceId = opts.instanceId || "";
   if (!instanceId || !eng()) {
     notify();
-    return getDebugState(instanceId);
+    return getInterventionUiState(instanceId);
   }
   try {
     if (mode === "off") {
@@ -131,7 +136,7 @@ export function setInterventionMode(mode, opts = {}) {
         prefs.lastReject =
           "Cannot disable while paused — Continue or Step first";
         notify();
-        return getDebugState(instanceId);
+        return getInterventionUiState(instanceId);
       }
       eng().disableIntervention();
     } else {
@@ -142,13 +147,7 @@ export function setInterventionMode(mode, opts = {}) {
     prefs.lastReject = formatReject(err);
   }
   notify();
-  return getDebugState(instanceId);
-}
-
-/** Back-compat alias used by older call sites. */
-export function setRunMode(mode, opts = {}) {
-  if (mode === "continuous") return setInterventionMode("off", opts);
-  return setInterventionMode(mode, opts);
+  return getInterventionUiState(instanceId);
 }
 
 /**
@@ -157,7 +156,7 @@ export function setRunMode(mode, opts = {}) {
  */
 export function syncSession(instanceId, mode = prefs.mode) {
   const api = eng();
-  if (!api || !instanceId) return getDebugState(instanceId);
+  if (!api || !instanceId) return getInterventionUiState(instanceId);
   if (mode === "off") {
     try {
       const st = getInterventionState(instanceId);
@@ -166,7 +165,7 @@ export function syncSession(instanceId, mode = prefs.mode) {
       /* ignore */
     }
     notify();
-    return getDebugState(instanceId);
+    return getInterventionUiState(instanceId);
   }
   const policy = mode === "step" ? "step" : "breakpoints";
   api.enableIntervention({ instanceId, policy });
@@ -176,7 +175,7 @@ export function syncSession(instanceId, mode = prefs.mode) {
   });
   prefs.lastReject = "";
   notify();
-  return getDebugState(instanceId);
+  return getInterventionUiState(instanceId);
 }
 
 export function isPaused(instanceId = "") {
@@ -188,21 +187,21 @@ export function hostEffectsAllowed(instanceId = "") {
 }
 
 export function toggleBreakpoint(elementId, opts = {}) {
-  if (!elementId) return getDebugState(opts.instanceId);
+  if (!elementId) return getInterventionUiState(opts.instanceId);
   if (prefs.breakpoints.has(elementId)) prefs.breakpoints.delete(elementId);
   else prefs.breakpoints.add(elementId);
   pushBreakpoints(opts.instanceId);
   notify();
-  return getDebugState(opts.instanceId);
+  return getInterventionUiState(opts.instanceId);
 }
 
 export function setBreakpoint(elementId, on, opts = {}) {
-  if (!elementId) return getDebugState(opts.instanceId);
+  if (!elementId) return getInterventionUiState(opts.instanceId);
   if (on) prefs.breakpoints.add(elementId);
   else prefs.breakpoints.delete(elementId);
   pushBreakpoints(opts.instanceId);
   notify();
-  return getDebugState(opts.instanceId);
+  return getInterventionUiState(opts.instanceId);
 }
 
 export function hasBreakpoint(elementId) {
@@ -213,7 +212,7 @@ export function clearBreakpoints(opts = {}) {
   prefs.breakpoints.clear();
   pushBreakpoints(opts.instanceId);
   notify();
-  return getDebugState(opts.instanceId);
+  return getInterventionUiState(opts.instanceId);
 }
 
 function pushBreakpoints(instanceId = "") {
@@ -308,19 +307,14 @@ export function shouldPauseBeforeHostEffect(_kind, _elementIds = []) {
   return { pause: false, elementId: "", reason: "" };
 }
 
-/** No-op: waits are projection waits; kernel owns barrier auto-pause. */
-export function evaluateAutoPause() {
-  return isPaused();
-}
-
-export function pauseReasonLabel(dbg = getDebugState()) {
-  if (!dbg.paused) {
-    if (dbg.mode === "off") return "Intervention off";
-    if (dbg.mode === "step") return "Step · running";
+export function pauseReasonLabel(ui = getInterventionUiState()) {
+  if (!ui.paused) {
+    if (ui.mode === "off") return "Intervention off";
+    if (ui.mode === "step") return "Step · running";
     return "Breakpoints · running";
   }
-  const at = dbg.pauseElementId ? ` @ ${dbg.pauseElementId}` : "";
-  switch (dbg.pauseReason) {
+  const at = ui.pauseElementId ? ` @ ${ui.pauseElementId}` : "";
+  switch (ui.pauseReason) {
     case "breakpoint":
       return `Paused · breakpoint${at}`;
     case "step":
@@ -328,7 +322,7 @@ export function pauseReasonLabel(dbg = getDebugState()) {
     case "manual":
       return `Paused${at}`;
     default:
-      return `Paused (${dbg.pauseReason || "?"})${at}`;
+      return `Paused (${ui.pauseReason || "?"})${at}`;
   }
 }
 
@@ -344,15 +338,4 @@ export function pendingSummary(pending) {
   }
   if (pending.enterChildId) parts.push(`child ${pending.enterChildId}`);
   return parts.join(" · ");
-}
-
-// Legacy no-ops kept so accidental imports do not crash during transition.
-export function pause() {
-  return getDebugState();
-}
-export function resume() {
-  return getDebugState();
-}
-export function resumeSuppressing() {
-  return getDebugState();
 }

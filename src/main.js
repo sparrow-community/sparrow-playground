@@ -21,10 +21,10 @@ import {
   looksLikeBpmn,
   setHostPolicy,
   getHostPolicy,
-  getDebugState,
+  getInterventionUiState,
   syncSession,
   isPaused,
-  onDebugChange,
+  onInterventionChange,
   disarmTimers,
   formatReject,
 } from "./engine/host.js";
@@ -32,7 +32,7 @@ import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
 import { renderWaits } from "./ui/waits.js";
 import { renderInspector } from "./ui/inspector.js";
-import { renderDebugger } from "./ui/debugger.js";
+import { renderIntervention } from "./ui/intervention.js";
 import { tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
 
 const $ = (id) => document.getElementById(id);
@@ -91,7 +91,7 @@ async function openXML(xml) {
   await importDiagram(modeler, xml, { autoLayoutIfMissing: true });
   selectedElement = null;
   paintInspector();
-  paintDebugger();
+  paintIntervention();
 }
 
 async function openFile(file) {
@@ -179,22 +179,22 @@ function selectInstance(id) {
   refreshPanel();
 }
 
-function paintDebugger() {
-  const el = $("debugger");
+function paintIntervention() {
+  const el = $("intervention");
   if (!el) return;
-  const dbg = getDebugState(currentInstanceId);
-  setBreakpointMarkers(modeler, dbg.breakpoints);
-  setPausedMarker(modeler, dbg.paused ? dbg.pauseElementId : "");
+  const ui = getInterventionUiState(currentInstanceId);
+  setBreakpointMarkers(modeler, ui.breakpoints);
+  setPausedMarker(modeler, ui.paused ? ui.pauseElementId : "");
   let variables = {};
   const eng = globalThis.sparrow;
-  if (eng && currentInstanceId && dbg.paused) {
+  if (eng && currentInstanceId && ui.paused) {
     try {
       variables = eng.getInstance(currentInstanceId)?.variables || {};
     } catch {
       variables = {};
     }
   }
-  renderDebugger(el, {
+  renderIntervention(el, {
     instanceId: currentInstanceId,
     selectedElementId: selectedElement?.id || "",
     variables,
@@ -221,10 +221,10 @@ function paintInspector() {
       selectedElement = null;
       selectElement(modeler, "");
       paintInspector();
-      paintDebugger();
+      paintIntervention();
     },
     onBreakpointChange: () => {
-      paintDebugger();
+      paintIntervention();
       paintInspector();
     },
   });
@@ -246,7 +246,7 @@ function refreshPanel() {
     setWaitingMarkers(modeler, []);
     highlighted = [];
     paintInspector();
-    paintDebugger();
+    paintIntervention();
     return;
   }
 
@@ -262,7 +262,7 @@ function refreshPanel() {
   });
   setWaitingMarkers(modeler, highlighted);
   paintInspector();
-  paintDebugger();
+  paintIntervention();
 
   try {
     const { events } = eng.listEvents(currentInstanceId);
@@ -378,7 +378,7 @@ function wireChrome() {
   $("auto-jobs")?.addEventListener("change", onPolicyChange);
   syncHostPolicyFromUI();
 
-  // MVP B: canvas selection → inspector; MVP C: debugger uses selection for Break
+  // MVP B: canvas selection → inspector; Intervention uses selection for Break
   onSelectionChanged(modeler, (el) => {
     if (!el || el.type === "bpmn:Process" || el.type === "bpmn:Collaboration") {
       selectedElement = null;
@@ -386,11 +386,11 @@ function wireChrome() {
       selectedElement = { id: el.id, type: el.type || "" };
     }
     paintInspector();
-    paintDebugger();
+    paintIntervention();
   });
 
-  onDebugChange(() => {
-    paintDebugger();
+  onInterventionChange(() => {
+    paintIntervention();
   });
 
   const overlay = $("drop-overlay");
@@ -418,7 +418,7 @@ function wireChrome() {
 async function boot() {
   wireChrome();
   await openEmpty(modeler);
-  paintDebugger();
+  paintIntervention();
   try {
     await loadEngine();
     $("btn-run").disabled = false;

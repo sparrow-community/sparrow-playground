@@ -21,7 +21,7 @@ Browser **modeler + run** surface for the Sparrow BPMN execution and fact kernel
   canvas click opens a per-node inspector with scoped COMMANDs (MVP B);
   **Intervention** section drives the kernel session (Off / Breakpoints / Step)
   with Continue · Step into · Step over, pending transition, and Set variables
-  while paused (host-only fake debug retired); Auto timers / Auto jobs toggles
+  while paused (host-only interception retired); Auto timers / Auto jobs toggles
   control JS host scheduling.
 
 ## Coordinate with the kernel
