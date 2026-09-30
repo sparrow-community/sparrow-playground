@@ -18,7 +18,7 @@ import {
   armTimers,
   drainJobs,
   listWaits,
-  looksLikeBpmn,
+  diagnoseBpmnXml,
   setHostPolicy,
   getHostPolicy,
   getInterventionUiState,
@@ -89,16 +89,31 @@ function downloadBlob(filename, text) {
 }
 
 async function openXML(xml) {
+  const reason = diagnoseBpmnXml(xml);
+  // Still try import when definitions exist but process is missing — modeler may show collaboration;
+  // Run will surface the process gap. Reject non-BPMN early.
+  if (reason && !/<(?:\w+:)?definitions[\s>]/i.test(String(xml || ""))) {
+    throw new Error(reason);
+  }
   await importDiagram(modeler, xml, { autoLayoutIfMissing: true });
   selectedElement = null;
   paintInspector();
   paintIntervention();
+  return reason;
 }
 
 async function openFile(file) {
-  const xml = await file.text();
-  await openXML(xml);
-  setStatus(`Opened ${file.name}`, "ok");
+  try {
+    const xml = await file.text();
+    const reason = await openXML(xml);
+    if (reason) {
+      setStatus(`Opened ${file.name} — ${reason}`, "err");
+    } else {
+      setStatus(`Opened ${file.name}`, "ok");
+    }
+  } catch (e) {
+    setStatus(`Open failed (${file.name}): ${e?.message || e}`, "err");
+  }
 }
 
 function renderInstanceSelect() {
@@ -302,8 +317,9 @@ async function runProcess() {
     playback.pause();
     activeRecordId = "";
     const xml = await exportXML(modeler);
-    if (!looksLikeBpmn(xml)) {
-      setStatus("Diagram is empty or missing a process — add elements or load an example.", "err");
+    const reason = diagnoseBpmnXml(xml);
+    if (reason) {
+      setStatus(reason, "err");
       return;
     }
     const eng = await ensureEngine();
