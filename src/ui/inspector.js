@@ -175,7 +175,7 @@ export function renderInspector(container, opts) {
   bpBtn.textContent = bpOn ? "BP ✓" : "BP";
   bpBtn.title = bpOn ? "Clear breakpoint" : "Set breakpoint";
   bpBtn.addEventListener("click", () => {
-    toggleBreakpoint(elementId);
+    toggleBreakpoint(elementId, { instanceId });
     onBreakpointChange?.();
   });
   headActions.appendChild(bpBtn);

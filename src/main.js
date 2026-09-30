@@ -22,10 +22,11 @@ import {
   setHostPolicy,
   getHostPolicy,
   getDebugState,
-  evaluateAutoPause,
+  syncSession,
   isPaused,
   onDebugChange,
   disarmTimers,
+  formatReject,
 } from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
@@ -181,11 +182,22 @@ function selectInstance(id) {
 function paintDebugger() {
   const el = $("debugger");
   if (!el) return;
-  const dbg = getDebugState();
+  const dbg = getDebugState(currentInstanceId);
   setBreakpointMarkers(modeler, dbg.breakpoints);
   setPausedMarker(modeler, dbg.paused ? dbg.pauseElementId : "");
+  let variables = {};
+  const eng = globalThis.sparrow;
+  if (eng && currentInstanceId && dbg.paused) {
+    try {
+      variables = eng.getInstance(currentInstanceId)?.variables || {};
+    } catch {
+      variables = {};
+    }
+  }
   renderDebugger(el, {
+    instanceId: currentInstanceId,
     selectedElementId: selectedElement?.id || "",
+    variables,
     onChange: () => tickRuntime(),
     onStatus: setStatus,
   });
@@ -203,7 +215,7 @@ function paintInspector() {
     waits: lastWaits,
     eng,
     onAction: () => tickRuntime(),
-    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onError: (e) => setStatus(formatReject(e), "err"),
     onSelectInstance: selectInstance,
     onClear: () => {
       selectedElement = null;
@@ -240,13 +252,12 @@ function refreshPanel() {
 
   const waits = listWaits(currentInstanceId);
   lastWaits = waits;
-  evaluateAutoPause(waits);
-  if (isPaused()) disarmTimers();
+  if (isPaused(currentInstanceId)) disarmTimers();
 
   highlighted = renderWaits(waitsEl, waits, {
     eng,
     onAction: () => tickRuntime(),
-    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onError: (e) => setStatus(formatReject(e), "err"),
     onSelectInstance: selectInstance,
   });
   setWaitingMarkers(modeler, highlighted);
@@ -267,18 +278,18 @@ function refreshPanel() {
 }
 
 /**
- * Host tick: refresh first (auto-pause on waits), then FireDue/Activate only if not paused.
+ * Host tick: refresh panel (kernel pause state), then FireDue/Activate only if not paused.
  */
 function tickRuntime() {
   refreshPanel();
-  if (isPaused()) return;
+  if (isPaused(currentInstanceId)) return;
   drainJobs(() => refreshPanel());
   armTimers(() => {
     drainJobs(() => refreshPanel());
     refreshPanel();
   });
   // Second refresh after sync job drain so markers/trail catch up.
-  if (!isPaused()) refreshPanel();
+  if (!isPaused(currentInstanceId)) refreshPanel();
 }
 
 async function runProcess() {
@@ -302,10 +313,12 @@ async function runProcess() {
       variables: { approved: true },
     });
     currentInstanceId = instanceId;
+    // Apply Intervention prefs after mint — CreateInstance may already hit barriers in step mode.
+    syncSession(instanceId);
     setStatus(`Running ${processId} · ${instanceId.slice(0, 8)}…`, "ok");
     tickRuntime();
   } catch (e) {
-    setStatus(String(e?.message || e), "err");
+    setStatus(formatReject(e), "err");
     // If the previous runtime died, bring a fresh one back for the next Run.
     try {
       await ensureEngine();

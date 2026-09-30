@@ -1,5 +1,5 @@
 /**
- * MVP C — debugger chrome: run mode, pause / continue / step, breakpoint list.
+ * Intervention chrome — kernel session mode, Continue / Step*, breakpoints, pending.
  */
 import {
   btnOutline,
@@ -9,16 +9,15 @@ import {
 } from "./classes.js";
 import {
   getDebugState,
-  setRunMode,
-  pause,
-  resumeSuppressing,
+  setInterventionMode,
+  resumeIntervention,
+  setPausedVariables,
   pauseReasonLabel,
-  peekHostEffect,
-  stepHostEffect,
+  pendingSummary,
   toggleBreakpoint,
   clearBreakpoints,
-  disarmTimers,
-  listWaits,
+  formatReject,
+  parseVarsJson,
 } from "../engine/host.js";
 
 function el(tag, className, text) {
@@ -31,14 +30,16 @@ function el(tag, className, text) {
 /**
  * @param {HTMLElement} container
  * @param {{
+ *   instanceId?: string,
  *   selectedElementId?: string,
+ *   variables?: Record<string, unknown>,
  *   onChange: () => void,
  *   onStatus?: (text: string, kind?: string) => void,
  * }} opts
  */
 export function renderDebugger(container, opts) {
-  const { selectedElementId, onChange, onStatus } = opts;
-  const dbg = getDebugState();
+  const { instanceId, selectedElementId, variables, onChange, onStatus } = opts;
+  const dbg = getDebugState(instanceId);
 
   container.innerHTML = "";
   container.className = "flex flex-col gap-2";
@@ -48,91 +49,62 @@ export function renderDebugger(container, opts) {
   const select = document.createElement("select");
   select.className =
     "h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring";
-  select.title = "Debug run mode";
+  select.title = "Intervention session mode (kernel)";
   for (const [value, label] of [
-    ["continuous", "Continuous"],
-    ["step", "Step (pause on waits)"],
+    ["off", "Off"],
     ["breakpoints", "Breakpoints"],
+    ["step", "Step"],
   ]) {
     const opt = document.createElement("option");
     opt.value = value;
     opt.textContent = label;
-    if (value === dbg.runMode) opt.selected = true;
+    if (value === dbg.mode) opt.selected = true;
     select.appendChild(opt);
   }
   select.addEventListener("change", () => {
-    setRunMode(select.value);
-    if (select.value === "continuous") {
-      // Re-arm host if we cleared an auto-pause.
+    const next = setInterventionMode(select.value, { instanceId });
+    if (next.lastReject) {
+      onStatus?.(next.lastReject, "err");
+      // Re-render so select reflects actual mode if disable was rejected.
       onChange();
-    } else {
-      onChange();
+      return;
     }
-    onStatus?.(pauseReasonLabel(), "ok");
+    onChange();
+    onStatus?.(pauseReasonLabel(next), "ok");
   });
   modeRow.appendChild(select);
   container.appendChild(modeRow);
 
   const controls = el("div", "flex flex-wrap items-center gap-1.5");
-  const pauseBtn = document.createElement("button");
-  pauseBtn.type = "button";
-  pauseBtn.className = btnOutline + " h-7 px-2 text-xs";
-  pauseBtn.textContent = "Pause";
-  pauseBtn.disabled = dbg.paused;
-  pauseBtn.title = "Stop JS host FireDue / Activate";
-  pauseBtn.addEventListener("click", () => {
-    pause("manual");
-    disarmTimers();
-    onChange();
-    onStatus?.(pauseReasonLabel(), "ok");
-  });
-  controls.appendChild(pauseBtn);
-
-  const contBtn = document.createElement("button");
-  contBtn.type = "button";
-  contBtn.className = btnPrimary + " h-7 px-2 text-xs";
-  contBtn.textContent = "Continue";
-  contBtn.disabled = !dbg.paused;
-  contBtn.title = "Resume host scheduling until next pause";
-  contBtn.addEventListener("click", () => {
-    // Avoid instantly re-pausing on the same wait set in step / breakpoints modes.
-    const eng = globalThis.sparrow;
-    const ids = eng?.listInstanceIds?.() || [];
-    const waits = [];
-    for (const id of ids) waits.push(...listWaits(id));
-    resumeSuppressing(waits);
-    onChange();
-    onStatus?.(pauseReasonLabel(), "ok");
-  });
-  controls.appendChild(contBtn);
-
-  const stepBtn = document.createElement("button");
-  stepBtn.type = "button";
-  stepBtn.className = btnOutline + " h-7 px-2 text-xs";
-  stepBtn.textContent = "Step";
-  stepBtn.title = "Run one pending FireDue or Activate+Complete, then pause";
-  stepBtn.addEventListener("click", () => {
-    // Ensure we are paused for step semantics.
-    if (!dbg.paused) pause("manual");
-    const pending = peekHostEffect();
-    if (!pending) {
-      onStatus?.(
-        "No pending host effect — use Waiting / Inspect COMMANDs",
-        "ok",
-      );
-      onChange();
-      return;
-    }
-    const result = stepHostEffect(() => onChange());
-    if (!result.did) {
-      onStatus?.("No pending host effect — use Waiting / Inspect COMMANDs", "ok");
-    } else {
-      const kind = result.effect?.type === "timer" ? "FireDue" : "Activate";
-      onStatus?.(`Stepped ${kind} · ${pauseReasonLabel()}`, "ok");
-    }
-    onChange();
-  });
-  controls.appendChild(stepBtn);
+  for (const [action, label, primary] of [
+    ["continue", "Continue", true],
+    ["stepInto", "Step into", false],
+    ["stepOver", "Step over", false],
+  ]) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = (primary ? btnPrimary : btnOutline) + " h-7 px-2 text-xs";
+    btn.textContent = label;
+    btn.disabled = !dbg.paused || !instanceId;
+    btn.title =
+      action === "continue"
+        ? "Resume until wait, end, or breakpoint"
+        : action === "stepInto"
+          ? "One pending transit, then next barrier"
+          : "Resume until next natural wait or end (honors breakpoints)";
+    btn.addEventListener("click", () => {
+      if (!instanceId) return;
+      try {
+        resumeIntervention(instanceId, action);
+        onChange();
+        onStatus?.(pauseReasonLabel(getDebugState(instanceId)), "ok");
+      } catch (err) {
+        onStatus?.(formatReject(err), "err");
+        onChange();
+      }
+    });
+    controls.appendChild(btn);
+  }
   container.appendChild(controls);
 
   const status = el(
@@ -142,11 +114,61 @@ export function renderDebugger(container, opts) {
   );
   container.appendChild(status);
 
+  if (dbg.lastReject) {
+    container.appendChild(
+      el("div", "font-mono text-[0.65rem] text-destructive", dbg.lastReject),
+    );
+  }
+
+  if (dbg.paused && dbg.pending) {
+    const pendingBox = el(
+      "div",
+      "rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[0.65rem] text-muted-foreground whitespace-pre-wrap break-all",
+      pendingSummary(dbg.pending),
+    );
+    container.appendChild(pendingBox);
+  }
+
+  if (dbg.paused && instanceId) {
+    const varSection = el("div", "flex flex-col gap-1");
+    varSection.appendChild(
+      el("div", muted + " text-[0.65rem]", "Variables (paused)"),
+    );
+    const ta = document.createElement("textarea");
+    ta.className =
+      "min-h-[4.5rem] w-full rounded-md border border-input bg-background px-2 py-1.5 font-mono text-[0.65rem] text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    ta.spellcheck = false;
+    try {
+      ta.value = JSON.stringify(variables ?? {}, null, 2);
+    } catch {
+      ta.value = "{}";
+    }
+    varSection.appendChild(ta);
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = btnOutline + " h-7 px-2 text-xs self-start";
+    apply.textContent = "Set variables";
+    apply.title = "Merge variables while barrier-paused (ledger COMMAND)";
+    apply.addEventListener("click", () => {
+      try {
+        const vars = parseVarsJson(ta.value) ?? {};
+        setPausedVariables(instanceId, vars);
+        onChange();
+        onStatus?.("Variables updated", "ok");
+      } catch (err) {
+        onStatus?.(formatReject(err), "err");
+      }
+    });
+    varSection.appendChild(apply);
+    container.appendChild(varSection);
+  }
+
   const bpRow = el("div", "flex flex-wrap items-center gap-1.5");
   const bpToggle = document.createElement("button");
   bpToggle.type = "button";
   bpToggle.className = btnOutline + " h-7 px-2 text-xs";
-  const selectedOn = selectedElementId && dbg.breakpoints.includes(selectedElementId);
+  const selectedOn =
+    selectedElementId && dbg.breakpoints.includes(selectedElementId);
   bpToggle.textContent = selectedOn ? "Clear BP" : "Break";
   bpToggle.disabled = !selectedElementId;
   bpToggle.title = selectedElementId
@@ -154,7 +176,7 @@ export function renderDebugger(container, opts) {
     : "Select a diagram node to set a breakpoint";
   bpToggle.addEventListener("click", () => {
     if (!selectedElementId) return;
-    toggleBreakpoint(selectedElementId);
+    toggleBreakpoint(selectedElementId, { instanceId });
     onChange();
     onStatus?.(
       `Breakpoint ${selectedOn ? "cleared" : "set"} · ${selectedElementId}`,
@@ -169,7 +191,7 @@ export function renderDebugger(container, opts) {
     clear.className = btnOutline + " h-7 px-2 text-xs";
     clear.textContent = "Clear all";
     clear.addEventListener("click", () => {
-      clearBreakpoints();
+      clearBreakpoints({ instanceId });
       onChange();
       onStatus?.("Breakpoints cleared", "ok");
     });
@@ -180,11 +202,15 @@ export function renderDebugger(container, opts) {
   if (dbg.breakpoints.length) {
     const list = el("div", "flex flex-wrap gap-1");
     for (const id of dbg.breakpoints) {
-      const chip = el("button", badgeOutline + " cursor-pointer font-mono text-[0.65rem]", id);
+      const chip = el(
+        "button",
+        badgeOutline + " cursor-pointer font-mono text-[0.65rem]",
+        id,
+      );
       chip.type = "button";
       chip.title = `Remove breakpoint ${id}`;
       chip.addEventListener("click", () => {
-        toggleBreakpoint(id);
+        toggleBreakpoint(id, { instanceId });
         onChange();
       });
       list.appendChild(chip);
@@ -195,7 +221,7 @@ export function renderDebugger(container, opts) {
       el(
         "div",
         muted + " text-[0.65rem]",
-        "Breakpoints: none — Break on selection, or toggle in Inspect.",
+        "Breakpoints: none — Break on selection, or toggle BP in Inspect.",
       ),
     );
   }
