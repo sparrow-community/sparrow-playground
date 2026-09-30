@@ -94,7 +94,7 @@ export function setBreakpointMarkers(modeler, elementIds) {
   }
 }
 
-/** Paused-at marker (MVP C) — distinct from waiting amber / inspect sky. */
+/** Paused-at marker (Intervention) — distinct from waiting amber / inspect sky. */
 export function setPausedMarker(modeler, elementId) {
   clearMarkers(modeler, "highlight-paused");
   if (!elementId) return;

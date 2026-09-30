@@ -21,17 +21,18 @@ import {
   looksLikeBpmn,
   setHostPolicy,
   getHostPolicy,
-  getDebugState,
-  evaluateAutoPause,
+  getInterventionUiState,
+  syncSession,
   isPaused,
-  onDebugChange,
+  onInterventionChange,
   disarmTimers,
+  formatReject,
 } from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
 import { renderWaits } from "./ui/waits.js";
 import { renderInspector } from "./ui/inspector.js";
-import { renderDebugger } from "./ui/debugger.js";
+import { renderIntervention } from "./ui/intervention.js";
 import { tabsTriggerActive, tabsTriggerIdle } from "./ui/classes.js";
 
 const $ = (id) => document.getElementById(id);
@@ -90,7 +91,7 @@ async function openXML(xml) {
   await importDiagram(modeler, xml, { autoLayoutIfMissing: true });
   selectedElement = null;
   paintInspector();
-  paintDebugger();
+  paintIntervention();
 }
 
 async function openFile(file) {
@@ -178,14 +179,25 @@ function selectInstance(id) {
   refreshPanel();
 }
 
-function paintDebugger() {
-  const el = $("debugger");
+function paintIntervention() {
+  const el = $("intervention");
   if (!el) return;
-  const dbg = getDebugState();
-  setBreakpointMarkers(modeler, dbg.breakpoints);
-  setPausedMarker(modeler, dbg.paused ? dbg.pauseElementId : "");
-  renderDebugger(el, {
+  const ui = getInterventionUiState(currentInstanceId);
+  setBreakpointMarkers(modeler, ui.breakpoints);
+  setPausedMarker(modeler, ui.paused ? ui.pauseElementId : "");
+  let variables = {};
+  const eng = globalThis.sparrow;
+  if (eng && currentInstanceId && ui.paused) {
+    try {
+      variables = eng.getInstance(currentInstanceId)?.variables || {};
+    } catch {
+      variables = {};
+    }
+  }
+  renderIntervention(el, {
+    instanceId: currentInstanceId,
     selectedElementId: selectedElement?.id || "",
+    variables,
     onChange: () => tickRuntime(),
     onStatus: setStatus,
   });
@@ -203,16 +215,16 @@ function paintInspector() {
     waits: lastWaits,
     eng,
     onAction: () => tickRuntime(),
-    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onError: (e) => setStatus(formatReject(e), "err"),
     onSelectInstance: selectInstance,
     onClear: () => {
       selectedElement = null;
       selectElement(modeler, "");
       paintInspector();
-      paintDebugger();
+      paintIntervention();
     },
     onBreakpointChange: () => {
-      paintDebugger();
+      paintIntervention();
       paintInspector();
     },
   });
@@ -234,24 +246,23 @@ function refreshPanel() {
     setWaitingMarkers(modeler, []);
     highlighted = [];
     paintInspector();
-    paintDebugger();
+    paintIntervention();
     return;
   }
 
   const waits = listWaits(currentInstanceId);
   lastWaits = waits;
-  evaluateAutoPause(waits);
-  if (isPaused()) disarmTimers();
+  if (isPaused(currentInstanceId)) disarmTimers();
 
   highlighted = renderWaits(waitsEl, waits, {
     eng,
     onAction: () => tickRuntime(),
-    onError: (e) => setStatus(String(e?.message || e), "err"),
+    onError: (e) => setStatus(formatReject(e), "err"),
     onSelectInstance: selectInstance,
   });
   setWaitingMarkers(modeler, highlighted);
   paintInspector();
-  paintDebugger();
+  paintIntervention();
 
   try {
     const { events } = eng.listEvents(currentInstanceId);
@@ -267,18 +278,18 @@ function refreshPanel() {
 }
 
 /**
- * Host tick: refresh first (auto-pause on waits), then FireDue/Activate only if not paused.
+ * Host tick: refresh panel (kernel pause state), then FireDue/Activate only if not paused.
  */
 function tickRuntime() {
   refreshPanel();
-  if (isPaused()) return;
+  if (isPaused(currentInstanceId)) return;
   drainJobs(() => refreshPanel());
   armTimers(() => {
     drainJobs(() => refreshPanel());
     refreshPanel();
   });
   // Second refresh after sync job drain so markers/trail catch up.
-  if (!isPaused()) refreshPanel();
+  if (!isPaused(currentInstanceId)) refreshPanel();
 }
 
 async function runProcess() {
@@ -302,10 +313,12 @@ async function runProcess() {
       variables: { approved: true },
     });
     currentInstanceId = instanceId;
+    // Apply Intervention prefs after mint — CreateInstance may already hit barriers in step mode.
+    syncSession(instanceId);
     setStatus(`Running ${processId} · ${instanceId.slice(0, 8)}…`, "ok");
     tickRuntime();
   } catch (e) {
-    setStatus(String(e?.message || e), "err");
+    setStatus(formatReject(e), "err");
     // If the previous runtime died, bring a fresh one back for the next Run.
     try {
       await ensureEngine();
@@ -365,7 +378,7 @@ function wireChrome() {
   $("auto-jobs")?.addEventListener("change", onPolicyChange);
   syncHostPolicyFromUI();
 
-  // MVP B: canvas selection → inspector; MVP C: debugger uses selection for Break
+  // MVP B: canvas selection → inspector; Intervention uses selection for Break
   onSelectionChanged(modeler, (el) => {
     if (!el || el.type === "bpmn:Process" || el.type === "bpmn:Collaboration") {
       selectedElement = null;
@@ -373,11 +386,11 @@ function wireChrome() {
       selectedElement = { id: el.id, type: el.type || "" };
     }
     paintInspector();
-    paintDebugger();
+    paintIntervention();
   });
 
-  onDebugChange(() => {
-    paintDebugger();
+  onInterventionChange(() => {
+    paintIntervention();
   });
 
   const overlay = $("drop-overlay");
@@ -405,7 +418,7 @@ function wireChrome() {
 async function boot() {
   wireChrome();
   await openEmpty(modeler);
-  paintDebugger();
+  paintIntervention();
   try {
     await loadEngine();
     $("btn-run").disabled = false;

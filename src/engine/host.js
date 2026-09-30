@@ -8,26 +8,29 @@ import wasmGzUrl from "@sparrow-community/wasm/sparrow.wasm.gz?url";
 import {
   hostEffectsAllowed,
   isPaused,
-  pause as debugPause,
-  resume as debugResume,
   shouldPauseBeforeHostEffect,
-} from "./debug.js";
+} from "./intervention.js";
 
 export {
-  getDebugState,
-  setRunMode,
-  pause,
-  resume,
-  resumeSuppressing,
+  getInterventionUiState,
+  getInterventionState,
+  getInterventionMode,
+  setInterventionMode,
+  syncSession,
   isPaused,
   toggleBreakpoint,
   setBreakpoint,
   hasBreakpoint,
   clearBreakpoints,
-  evaluateAutoPause,
-  onDebugChange,
+  onInterventionChange,
   pauseReasonLabel,
-} from "./debug.js";
+  pendingSummary,
+  resumeIntervention,
+  setPausedVariables,
+  formatReject,
+  noteReject,
+  hostEffectsAllowed,
+} from "./intervention.js";
 
 let ready = null;
 let timerHandle = null;
@@ -53,7 +56,7 @@ export function setHostPolicy(partial = {}) {
   return getHostPolicy();
 }
 
-/** Cancel armed timer without changing autoTimers preference (MVP C pause). */
+/** Cancel armed timer without changing autoTimers preference (Intervention pause). */
 export function disarmTimers() {
   clearTimeout(timerHandle);
   timerHandle = null;
@@ -211,10 +214,8 @@ export function armTimers(onFire) {
     if (!hostEffectsAllowed()) return;
     const targets = timerWaitElementIds(eng);
     const gate = shouldPauseBeforeHostEffect("timer", targets);
-    if (gate.pause) {
-      debugPause(gate.reason || "host-timer", gate.elementId);
-      return;
-    }
+    // Kernel barrier-pause: skip FireDue until Continue / Step*.
+    if (gate.pause) return;
     try {
       eng.fireDue();
       onFire?.();
@@ -290,10 +291,7 @@ export function drainJobs(onChange) {
       "job",
       jobWaitElementIds(eng, jobType),
     );
-    if (gate.pause) {
-      debugPause(gate.reason || "host-job", gate.elementId);
-      return;
-    }
+    if (gate.pause) return;
     runJobsOfType(eng, jobType, null, onChange);
   }
 }
@@ -319,69 +317,6 @@ function jobWaitElementIds(eng, jobType) {
     }
   }
   return ids;
-}
-
-/**
- * Peek the next JS-host effect (due timer or job wait) for Step Over.
- * @returns {{ type: 'timer', dueUnixMs: number, elementId: string } | { type: 'job', wait: object } | null}
- */
-export function peekHostEffect() {
-  const eng = globalThis.sparrow;
-  if (!eng) return null;
-  let due = 0;
-  try {
-    due = eng.nextDueUnixMs() || 0;
-  } catch {
-    due = 0;
-  }
-  if (due > 0) {
-    const targets = timerWaitElementIds(eng);
-    return {
-      type: "timer",
-      dueUnixMs: due,
-      elementId: targets[0] || "",
-    };
-  }
-  const waits = [];
-  let instanceIds;
-  try {
-    instanceIds = eng.listInstanceIds();
-  } catch {
-    return null;
-  }
-  for (const id of instanceIds) {
-    for (const w of listWaits(id, { includeChildren: true })) {
-      if (w.kind === "job" && w.jobType) waits.push(w);
-    }
-  }
-  if (waits.length) return { type: "job", wait: waits[0] };
-  return null;
-}
-
-/**
- * Execute exactly one pending host FireDue or Activate+Complete, then re-pause.
- * Wait-panel COMMANDs remain available while paused; this only steps JS host effects.
- */
-export function stepHostEffect(onChange) {
-  const effect = peekHostEffect();
-  if (!effect) {
-    debugPause("step", "");
-    return { did: false, reason: "no-host-effect" };
-  }
-  // Temporarily clear pause so FireDue/Activate are allowed.
-  if (isPaused()) debugResume();
-  try {
-    if (effect.type === "timer") {
-      fireTimerNow(effect.dueUnixMs);
-    } else {
-      runJobForWait(effect.wait, "complete");
-    }
-  } finally {
-    disarmTimers();
-    debugPause("step", effect.elementId || effect.wait?.elementId || "");
-  }
-  onChange?.();
-  return { did: true, effect };
 }
 
 /**

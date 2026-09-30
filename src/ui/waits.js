@@ -15,6 +15,7 @@ import {
   runJobForWait,
   parseVarsJson,
   getHostPolicy,
+  formatReject,
 } from "../engine/host.js";
 
 function el(tag, className, text) {
@@ -120,7 +121,7 @@ function appendActions(card, wait, { eng, onAction, onError }) {
       fn();
       onAction?.();
     } catch (e) {
-      onError?.(e);
+      onError?.(formatReject(e));
     }
   };
 
