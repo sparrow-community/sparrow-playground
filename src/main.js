@@ -27,6 +27,7 @@ import {
   onInterventionChange,
   disarmTimers,
   formatReject,
+  decodeInstanceVariables,
 } from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
@@ -189,7 +190,11 @@ function paintIntervention() {
   const eng = globalThis.sparrow;
   if (eng && currentInstanceId && ui.paused) {
     try {
-      variables = eng.getInstance(currentInstanceId)?.variables || {};
+      // getInstance returns json_value strings; decode so the editor shows
+      // real bool/number/null (e.g. approved: false) before Set variables.
+      variables = decodeInstanceVariables(
+        eng.getInstance(currentInstanceId)?.variables || {},
+      );
     } catch {
       variables = {};
     }

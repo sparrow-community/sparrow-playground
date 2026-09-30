@@ -10,7 +10,7 @@ import {
   sectionLabel,
 } from "./classes.js";
 import { renderWaitCard } from "./waits.js";
-import { hasBreakpoint, toggleBreakpoint } from "../engine/host.js";
+import { hasBreakpoint, toggleBreakpoint, decodeInstanceVariables } from "../engine/host.js";
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -240,7 +240,7 @@ export function renderInspector(container, opts) {
     const pre = el(
       "pre",
       "overflow-x-auto rounded-md border border-border bg-background p-2 font-mono text-[0.65rem] text-muted-foreground whitespace-pre-wrap break-all",
-      jsonSnippet(ctx.instance.variables),
+      jsonSnippet(decodeInstanceVariables(ctx.instance.variables)),
     );
     varSection.appendChild(pre);
     container.appendChild(varSection);
