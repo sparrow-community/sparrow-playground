@@ -24,7 +24,7 @@ const EMPTY_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </definitions>`;
 
 export function hasDiagramDI(xml) {
-  return /<bpmndi:BPMNDiagram[\s>]/i.test(xml) || /<BPMNDiagram[\s>]/i.test(xml);
+  return new RegExp(`<(?:\\w+:)?BPMNDiagram[\\s>]`, "i").test(xml);
 }
 
 export function createModeler(container) {
