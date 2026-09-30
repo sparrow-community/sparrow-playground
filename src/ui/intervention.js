@@ -148,7 +148,8 @@ export function renderIntervention(container, opts) {
     apply.type = "button";
     apply.className = btnOutline + " h-7 px-2 text-xs self-start";
     apply.textContent = "Set variables";
-    apply.title = "Merge variables while barrier-paused (ledger COMMAND)";
+    apply.title =
+      "Merge variables while barrier-paused (ledger COMMAND). Use JSON types (false not \"false\").";
     apply.addEventListener("click", () => {
       try {
         const vars = parseVarsJson(ta.value) ?? {};
