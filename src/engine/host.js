@@ -32,6 +32,8 @@ export {
   hostEffectsAllowed,
 } from "./intervention.js";
 
+export { decodeInstanceVariables } from "./variables.js";
+
 let ready = null;
 let timerHandle = null;
 let wasmBytesCache = null;
@@ -529,7 +531,11 @@ export function looksLikeBpmn(xml) {
   return /<definitions[\s>]/i.test(s) && /<process[\s>]/i.test(s);
 }
 
-/** Parse a vars textarea: empty → undefined; JSON object; else error. */
+/**
+ * Parse a vars textarea: empty → undefined; JSON object; else error.
+ * Types follow JSON (bool / number / null / object / array / string).
+ * Quoted strings stay strings — do not re-decode after this.
+ */
 export function parseVarsJson(text) {
   const raw = String(text ?? "").trim();
   if (!raw) return undefined;
