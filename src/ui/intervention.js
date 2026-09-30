@@ -8,7 +8,7 @@ import {
   badgeOutline,
 } from "./classes.js";
 import {
-  getDebugState,
+  getInterventionUiState,
   setInterventionMode,
   resumeIntervention,
   setPausedVariables,
@@ -37,9 +37,9 @@ function el(tag, className, text) {
  *   onStatus?: (text: string, kind?: string) => void,
  * }} opts
  */
-export function renderDebugger(container, opts) {
+export function renderIntervention(container, opts) {
   const { instanceId, selectedElementId, variables, onChange, onStatus } = opts;
-  const dbg = getDebugState(instanceId);
+  const ui = getInterventionUiState(instanceId);
 
   container.innerHTML = "";
   container.className = "flex flex-col gap-2";
@@ -58,7 +58,7 @@ export function renderDebugger(container, opts) {
     const opt = document.createElement("option");
     opt.value = value;
     opt.textContent = label;
-    if (value === dbg.mode) opt.selected = true;
+    if (value === ui.mode) opt.selected = true;
     select.appendChild(opt);
   }
   select.addEventListener("change", () => {
@@ -85,7 +85,7 @@ export function renderDebugger(container, opts) {
     btn.type = "button";
     btn.className = (primary ? btnPrimary : btnOutline) + " h-7 px-2 text-xs";
     btn.textContent = label;
-    btn.disabled = !dbg.paused || !instanceId;
+    btn.disabled = !ui.paused || !instanceId;
     btn.title =
       action === "continue"
         ? "Resume until wait, end, or breakpoint"
@@ -97,7 +97,7 @@ export function renderDebugger(container, opts) {
       try {
         resumeIntervention(instanceId, action);
         onChange();
-        onStatus?.(pauseReasonLabel(getDebugState(instanceId)), "ok");
+        onStatus?.(pauseReasonLabel(getInterventionUiState(instanceId)), "ok");
       } catch (err) {
         onStatus?.(formatReject(err), "err");
         onChange();
@@ -110,26 +110,26 @@ export function renderDebugger(container, opts) {
   const status = el(
     "div",
     "font-mono text-[0.65rem] text-muted-foreground",
-    pauseReasonLabel(dbg),
+    pauseReasonLabel(ui),
   );
   container.appendChild(status);
 
-  if (dbg.lastReject) {
+  if (ui.lastReject) {
     container.appendChild(
-      el("div", "font-mono text-[0.65rem] text-destructive", dbg.lastReject),
+      el("div", "font-mono text-[0.65rem] text-destructive", ui.lastReject),
     );
   }
 
-  if (dbg.paused && dbg.pending) {
+  if (ui.paused && ui.pending) {
     const pendingBox = el(
       "div",
       "rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[0.65rem] text-muted-foreground whitespace-pre-wrap break-all",
-      pendingSummary(dbg.pending),
+      pendingSummary(ui.pending),
     );
     container.appendChild(pendingBox);
   }
 
-  if (dbg.paused && instanceId) {
+  if (ui.paused && instanceId) {
     const varSection = el("div", "flex flex-col gap-1");
     varSection.appendChild(
       el("div", muted + " text-[0.65rem]", "Variables (paused)"),
@@ -168,7 +168,7 @@ export function renderDebugger(container, opts) {
   bpToggle.type = "button";
   bpToggle.className = btnOutline + " h-7 px-2 text-xs";
   const selectedOn =
-    selectedElementId && dbg.breakpoints.includes(selectedElementId);
+    selectedElementId && ui.breakpoints.includes(selectedElementId);
   bpToggle.textContent = selectedOn ? "Clear BP" : "Break";
   bpToggle.disabled = !selectedElementId;
   bpToggle.title = selectedElementId
@@ -185,7 +185,7 @@ export function renderDebugger(container, opts) {
   });
   bpRow.appendChild(bpToggle);
 
-  if (dbg.breakpoints.length) {
+  if (ui.breakpoints.length) {
     const clear = document.createElement("button");
     clear.type = "button";
     clear.className = btnOutline + " h-7 px-2 text-xs";
@@ -199,9 +199,9 @@ export function renderDebugger(container, opts) {
   }
   container.appendChild(bpRow);
 
-  if (dbg.breakpoints.length) {
+  if (ui.breakpoints.length) {
     const list = el("div", "flex flex-wrap gap-1");
-    for (const id of dbg.breakpoints) {
+    for (const id of ui.breakpoints) {
       const chip = el(
         "button",
         badgeOutline + " cursor-pointer font-mono text-[0.65rem]",

@@ -9,22 +9,20 @@ import {
   hostEffectsAllowed,
   isPaused,
   shouldPauseBeforeHostEffect,
-} from "./debug.js";
+} from "./intervention.js";
 
 export {
-  getDebugState,
+  getInterventionUiState,
   getInterventionState,
   getInterventionMode,
   setInterventionMode,
-  setRunMode,
   syncSession,
   isPaused,
   toggleBreakpoint,
   setBreakpoint,
   hasBreakpoint,
   clearBreakpoints,
-  evaluateAutoPause,
-  onDebugChange,
+  onInterventionChange,
   pauseReasonLabel,
   pendingSummary,
   resumeIntervention,
@@ -32,7 +30,7 @@ export {
   formatReject,
   noteReject,
   hostEffectsAllowed,
-} from "./debug.js";
+} from "./intervention.js";
 
 let ready = null;
 let timerHandle = null;
@@ -58,7 +56,7 @@ export function setHostPolicy(partial = {}) {
   return getHostPolicy();
 }
 
-/** Cancel armed timer without changing autoTimers preference (MVP C pause). */
+/** Cancel armed timer without changing autoTimers preference (Intervention pause). */
 export function disarmTimers() {
   clearTimeout(timerHandle);
   timerHandle = null;
