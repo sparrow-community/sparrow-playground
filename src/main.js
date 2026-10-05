@@ -28,6 +28,7 @@ import {
   disarmTimers,
   formatReject,
   decodeInstanceVariables,
+  mintInstance,
 } from "./engine/host.js";
 import { parseRecord, renderTrail } from "./ui/trail.js";
 import { createPlayback } from "./ui/playback.js";
@@ -330,14 +331,18 @@ async function runProcess() {
       return;
     }
     const { deploymentId, processId } = deployed;
-    const { instanceId } = eng.createInstance({
+    // None start → CreateInstance; typed-only (e.g. MIWG C.10.0) → PublishMessage/Signal/FireDue.
+    const { instanceId, via } = mintInstance(eng, {
       deploymentId,
+      processId,
+      xml,
       variables: { approved: true },
     });
     currentInstanceId = instanceId;
     // Apply Intervention prefs after mint — CreateInstance may already hit barriers in step mode.
     syncSession(instanceId);
-    setStatus(`Running ${processId} · ${instanceId.slice(0, 8)}…`, "ok");
+    const viaNote = via && via !== "createInstance" ? ` via ${via}` : "";
+    setStatus(`Running ${processId}${viaNote} · ${instanceId.slice(0, 8)}…`, "ok");
     tickRuntime();
   } catch (e) {
     setStatus(formatReject(e), "err");

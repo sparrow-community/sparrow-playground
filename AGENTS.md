@@ -16,8 +16,9 @@ Browser **modeler + run** surface for the Sparrow BPMN execution and fact kernel
 
 - Full-bleed **bpmn-js** modeler on load (Open / Download / drag-drop).
 - Missing DI → `bpmn-auto-layout` before import.
-- **Run** deploys current XML and starts a new instance; Events + waits in a
-  collapsible side panel. Every wait kind has a manual affordance (MVP A);
+- **Run** deploys current XML and starts a new instance (typed-only starts mint
+  via PublishMessage / PublishSignal / FireDue / EvaluateConditionalStarts);
+  Events + waits in a collapsible side panel. Every wait kind has a manual affordance (MVP A);
   canvas click opens a per-node inspector with scoped COMMANDs (MVP B);
   **Intervention** section drives the kernel session (Off / Breakpoints / Step)
   with Continue · Step into · Step over, pending transition, and Set variables

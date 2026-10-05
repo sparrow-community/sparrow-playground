@@ -34,6 +34,7 @@ export {
 } from "./intervention.js";
 
 export { decodeInstanceVariables } from "./variables.js";
+export { listTypedStarts, mintInstance } from "./typed-start.js";
 
 let ready = null;
 let timerHandle = null;
