@@ -1,7 +1,7 @@
 /**
  * Intervention session adapter — kernel WASM is source of truth.
- * Local prefs (mode + breakpoints) apply on Run / Enable; host only gates
- * FireDue/Activate while the kernel reports paused.
+ * Local prefs (mode + breakpoints) apply on Run / Enable; host gates
+ * FireDue/Activate via kernel hostEffectAllowed (fallback: !paused).
  */
 
 /** @typedef {'off' | 'breakpoints' | 'step'} InterventionMode */
@@ -50,6 +50,30 @@ function emptyKernelState(instanceId = "") {
     pauseElementId: "",
     pauseTokenId: "",
     pending: undefined,
+    blockHostEffects: false,
+  };
+}
+
+function normalizePending(pending) {
+  if (!pending || typeof pending !== "object") return undefined;
+  return {
+    kind: pending.kind || "",
+    fromElementId: pending.fromElementId || "",
+    tokenId: pending.tokenId || "",
+    takenFlowIds: Array.isArray(pending.takenFlowIds)
+      ? pending.takenFlowIds.slice()
+      : undefined,
+    nextElementIds: Array.isArray(pending.nextElementIds)
+      ? pending.nextElementIds.slice()
+      : undefined,
+    outgoingFlowId: pending.outgoingFlowId || undefined,
+    enterChildId: pending.enterChildId || undefined,
+    spawnChildToken: pending.spawnChildToken || undefined,
+    linkCatchIds: Array.isArray(pending.linkCatchIds)
+      ? pending.linkCatchIds.slice()
+      : undefined,
+    decideMode: pending.decideMode || undefined,
+    terminateJoinPeers: pending.terminateJoinPeers || undefined,
   };
 }
 
@@ -78,7 +102,8 @@ export function getInterventionState(instanceId = "") {
       pauseReason: st.pauseReason || "",
       pauseElementId: st.pauseElementId || "",
       pauseTokenId: st.pauseTokenId || "",
-      pending: st.pending || undefined,
+      pending: normalizePending(st.pending),
+      blockHostEffects: !!st.blockHostEffects,
     };
   } catch {
     return emptyKernelState(instanceId);
@@ -99,6 +124,7 @@ export function getInterventionUiState(instanceId = "") {
     pauseElementId: st.pauseElementId,
     pauseTokenId: st.pauseTokenId,
     pending: st.pending,
+    blockHostEffects: st.blockHostEffects,
     breakpoints:
       prefs.mode === "off"
         ? [...prefs.breakpoints]
@@ -138,7 +164,7 @@ export function setInterventionMode(mode, opts = {}) {
         notify();
         return getInterventionUiState(instanceId);
       }
-      eng().disableIntervention();
+      eng().disableIntervention({ instanceId });
     } else {
       syncSession(instanceId, mode);
     }
@@ -160,7 +186,9 @@ export function syncSession(instanceId, mode = prefs.mode) {
   if (mode === "off") {
     try {
       const st = getInterventionState(instanceId);
-      if (!st.paused && st.enabled) api.disableIntervention();
+      if (!st.paused && st.enabled) {
+        api.disableIntervention({ instanceId });
+      }
     } catch {
       /* ignore */
     }
@@ -182,8 +210,25 @@ export function isPaused(instanceId = "") {
   return getInterventionState(instanceId).paused;
 }
 
+/**
+ * Prefer kernel hostEffectAllowed (Intervention 1–7). Fallback: !paused /
+ * !blockHostEffects when the WASM surface is missing (older pins).
+ * @param {string} [instanceId]
+ */
 export function hostEffectsAllowed(instanceId = "") {
-  return !isPaused(instanceId);
+  const api = eng();
+  const st = getInterventionState(instanceId);
+  const id = instanceId || st.focusInstanceId || "";
+  if (api?.hostEffectAllowed && id) {
+    try {
+      const out = api.hostEffectAllowed({ instanceId: id });
+      if (out && typeof out.allowed === "boolean") return out.allowed;
+    } catch {
+      /* fall through to state-based gate */
+    }
+  }
+  if (st.blockHostEffects) return false;
+  return !st.paused;
 }
 
 export function toggleBreakpoint(elementId, opts = {}) {
@@ -254,6 +299,23 @@ export function resumeIntervention(instanceId, action = "continue") {
 }
 
 /**
+ * Kernel PauseReasonManual — arms immediate pause on wait, else next barrier.
+ * Not exposed as panel chrome (product: no host Pause control); available for
+ * callers / future affordances without inventing a fourth mode.
+ * @param {string} instanceId
+ */
+export function pauseIntervention(instanceId) {
+  const api = eng();
+  if (!api?.pause || !instanceId) {
+    throw new Error("pause unavailable or instance not ready");
+  }
+  const out = api.pause({ instanceId });
+  prefs.lastReject = "";
+  notify();
+  return out;
+}
+
+/**
  * @param {string} instanceId
  * @param {Record<string, unknown>} variables
  */
@@ -292,16 +354,16 @@ export function clearReject() {
 }
 
 /**
- * Host FireDue/Activate gate: block only while kernel barrier-paused.
+ * Host FireDue/Activate gate: prefer kernel hostEffectAllowed / blockHostEffects.
  * @returns {{ pause: boolean, elementId: string, reason: string }}
  */
-export function shouldPauseBeforeHostEffect(_kind, _elementIds = []) {
-  const st = getInterventionState();
-  if (st.paused) {
+export function shouldPauseBeforeHostEffect(_kind, _elementIds = [], instanceId = "") {
+  const st = getInterventionState(instanceId);
+  if (!hostEffectsAllowed(instanceId || st.focusInstanceId)) {
     return {
       pause: true,
       elementId: st.pauseElementId,
-      reason: st.pauseReason || "paused",
+      reason: st.pauseReason || (st.blockHostEffects ? "blockHostEffects" : "paused"),
     };
   }
   return { pause: false, elementId: "", reason: "" };
@@ -328,14 +390,24 @@ export function pauseReasonLabel(ui = getInterventionUiState()) {
 
 export function pendingSummary(pending) {
   if (!pending) return "";
-  const parts = [pending.kind || "pending"];
+  const kind = pending.kind || "pending";
+  const parts = [kind];
   if (pending.fromElementId) parts.push(`from ${pending.fromElementId}`);
+  if (pending.decideMode) parts.push(`mode ${pending.decideMode}`);
   if (pending.takenFlowIds?.length) {
     parts.push(`taken ${pending.takenFlowIds.join(",")}`);
   }
   if (pending.nextElementIds?.length) {
     parts.push(`next ${pending.nextElementIds.join(",")}`);
   }
+  if (pending.outgoingFlowId) parts.push(`flow ${pending.outgoingFlowId}`);
   if (pending.enterChildId) parts.push(`child ${pending.enterChildId}`);
+  if (pending.spawnChildToken) parts.push("spawn child token");
+  if (pending.linkCatchIds?.length) {
+    parts.push(`link ${pending.linkCatchIds.join(",")}`);
+  }
+  if (pending.terminateJoinPeers) {
+    parts.push(`terminate ${pending.terminateJoinPeers}`);
+  }
   return parts.join(" · ");
 }

@@ -44,7 +44,7 @@ GitHub Pages deploys `dist/` from `main` via [`.github/workflows/pages.yml`](./.
 | | |
 |---|---|
 | npm | `@sparrow-community/wasm` |
-| Locked version | see `package.json` / `package-lock.json` (currently `2026.9.30-alpha.1`) |
+| Locked version | see `package.json` / `package-lock.json` (currently `2026.9.30-alpha.4`) |
 | Dist-tags | `latest` and `alpha` both track calver `YYYY.M.D-alpha.N` |
 | Upgrade | bump the dependency, run `npm install`, commit lockfile |
 

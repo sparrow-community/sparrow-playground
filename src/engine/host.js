@@ -26,6 +26,7 @@ export {
   pauseReasonLabel,
   pendingSummary,
   resumeIntervention,
+  pauseIntervention,
   setPausedVariables,
   formatReject,
   noteReject,

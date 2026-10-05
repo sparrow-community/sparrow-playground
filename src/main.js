@@ -23,7 +23,7 @@ import {
   getHostPolicy,
   getInterventionUiState,
   syncSession,
-  isPaused,
+  hostEffectsAllowed,
   onInterventionChange,
   disarmTimers,
   formatReject,
@@ -272,7 +272,7 @@ function refreshPanel() {
 
   const waits = listWaits(currentInstanceId);
   lastWaits = waits;
-  if (isPaused(currentInstanceId)) disarmTimers();
+  if (!hostEffectsAllowed(currentInstanceId)) disarmTimers();
 
   highlighted = renderWaits(waitsEl, waits, {
     eng,
@@ -298,18 +298,19 @@ function refreshPanel() {
 }
 
 /**
- * Host tick: refresh panel (kernel pause state), then FireDue/Activate only if not paused.
+ * Host tick: refresh panel (kernel pause state), then FireDue/Activate only when
+ * kernel hostEffectAllowed.
  */
 function tickRuntime() {
   refreshPanel();
-  if (isPaused(currentInstanceId)) return;
+  if (!hostEffectsAllowed(currentInstanceId)) return;
   drainJobs(() => refreshPanel());
   armTimers(() => {
     drainJobs(() => refreshPanel());
     refreshPanel();
   });
   // Second refresh after sync job drain so markers/trail catch up.
-  if (!isPaused(currentInstanceId)) refreshPanel();
+  if (hostEffectsAllowed(currentInstanceId)) refreshPanel();
 }
 
 async function runProcess() {
