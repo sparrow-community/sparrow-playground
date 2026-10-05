@@ -25,7 +25,7 @@ Vite prints a local URL (default [http://127.0.0.1:5173/](http://127.0.0.1:5173/
 
 - **Open**, **Download**, or drag a `.bpmn` file onto the page. Diagrams without DI are laid out with `bpmn-auto-layout` before import.
 - **Example** loads `public/examples/user-task.bpmn`.
-- **Run** deploys the current XML and starts a new instance.
+- **Run** deploys the current XML and starts a new instance. Processes with only typed starts (message / signal / timer / conditional — e.g. MIWG `C.10.0`) auto-mint via the first available trigger instead of failing with `no none start`.
 - The side panel **Intervention** section drives the kernel session (`enableIntervention` / breakpoints / Continue · Step into · Step over via `@sparrow-community/wasm`). Mode **Off** leaves execution continuous; **Breakpoints** and **Step** pause at Enter-settled barriers (e.g. exclusive gateway before decide). While paused you can inspect pending transition, edit variables (`setVariables`), then resume. **Inspect** shows tokens, intent, variables, and scoped COMMANDs for the selected diagram node (toggle **BP** there too). **Waiting** lists all active waits with kind-specific actions (Complete, Publish Message/Signal with optional correlation keys, Fire due now, Evaluate conditions, Resolve incident, job Complete/Fail). Mutating COMMANDs while barrier-paused are rejected with a clear status message. Call Activity waits and the inspector deep-link parent/child instances. Toggle **Auto timers** / **Auto jobs** for JS host scheduling. Trail playback remains a viewer (not live step control).
 
 ## Build
